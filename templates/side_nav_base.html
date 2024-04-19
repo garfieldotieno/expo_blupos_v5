@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+   <!-- Bootstrap CSS -->
+   <link rel="stylesheet" href="{{ url_for('static', filename='node_modules/bootstrap/dist/css/bootstrap.min.css') }}">
+
+   <!-- main css -->
+   <link rel="stylesheet"  href="{{ url_for('static', filename='css/main.css') }}">
+
+  
+   <!-- fontawesome4.7 -->
+   <link rel="stylesheet" href="{{url_for('static', filename='node_modules/font-awesome/css/font-awesome.css')}}">
+   
+   <!-- google fonts -->
+   
+    <!--Datatable css-->
+    <!-- <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css"> -->
+    <!-- let file_name='DataTables/datatables.min.css' -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='DataTables/datatables.min.css') }}">
+    
+    
+   <!-- splidejs css in static directory, -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='splide-3.1.2/dist/css/splide.min.css')}}">
+    
+
+<title>{{title}}</title>
+</head>
+<body id="body" >
+
+  <nav class="navbar fixed-top navbar-expand-lg navbar-light" style="height:80px; background-color:#FEC620;font-weight: bolder; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;">
+    
+    <div class="container-fluid">
+      <div class="navbar-header">
+        <a class="navbar-brand" href="/" style="color: #182A62;">Blu P.O.S</a>
+      </div>
+      
+      {%if is_active  -%}
+      <ul class="nav navbar-nav">
+        <h4 class="text-center"><span style="color:#182A62;">{{title}}</span></h4>
+      </ul>
+      <ul class="nav navbar-nav">
+        <li><p class="nav-link"><span id="user_name_span" style="position: relative; top: 15%;">{{user_name['user_name']}}</span></p></li>
+        
+        <li><a class="nav-link" href="/logout" style="font-size:x-large; font-weight: bold; color:#182A62"><i class="fa fa-sign-out" aria-hidden="true"></i> </span></a></li>
+      
+    </ul>
+      {%- endif %}
+      
+    </div>
+  </nav>
+  <div style="height: 70px;">
+
+  </div>
+
+
+
+
+  
+{% block content %}
+{% endblock %}
+
+    <!-- Option 1: jQuery and Bootstrap Bundle (includes Popper) -->
+    <script src="{{ url_for('static', filename='node_modules/jquery/dist/jquery.slim.min.js') }}" ></script>
+     
+    <!-- <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ho+j7jyWK8fNQe+A12Hb8AhRq26LrZ/JpcUGGOn+Y7RsweNrtN/tE3MoK7ZeZDyx" crossorigin="anonymous"></script> -->
+    <script src="{{ url_for('static', filename='node_modules/bootstrap/dist/js/bootstrap.bundle.js') }}"></script>
+
+    <!-- main javascript -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
+    <!-- barcode -->
+    <script src="{{ url_for('static', filename='js/JsBarcode.all.min.js') }}"></script>
+
+    <!-- qrcode -->
+    <script src="{{ url_for('static', filename='js/qrcode_dev/qrcode.min.js') }}"></script>
+
+    
+    <!-- lottie -->
+    <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
+
+    <!-- Data Table Js -->
+    <!-- <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script> -->
+    <!-- let file_name='DataTables/datatables.min.js' -->
+    <script src="{{ url_for('static', filename='DataTables/datatables.min.js') }}"></script>
+
+
+
+       
+</body>
+</html> 

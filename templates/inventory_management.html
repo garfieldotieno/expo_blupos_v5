@@ -1,0 +1,306 @@
+{% extends 'side_nav_base.html' %}
+
+{% block content %}
+<br>
+<div class="container-fluid" style="position: relative; margin: auto;">
+    
+    {% if flash_message -%}
+    <div class="after-container4" id="flash_message_container">
+        <p class="spacer" style="height: 12px;"></p>
+        <div class="info_pad" >
+            <div class="row">
+                <div class="col-11">
+                    <p class="text-center">{{flash_payload}}</p>
+                </div>
+                <div class="col-1">
+                    <span class="" onclick="destroy_el()">
+                        <i class="fa fa-times-circle" style="font-weight: bolder;"></i>
+                    </span>
+                </div>
+            </div>
+        </div>
+        <p class="spacer" style="height: 18px;"></p>
+    </div>
+    {%- endif %}
+
+    <div class="after-container4">
+        <p class="spacer" style="height: 12px;"></p>
+        <div class="info_pad">
+            <form action="/add_item_inventory" method="post" class="container">
+                <div class="row">
+                    <div class="col-1"></div>
+                    <div class="col-10">
+                        <h3 class="text-center"><b>Enter Item Details</b></h3>
+                        <br>
+                    </div>
+                    <div class="col-1"></div>
+                </div>
+                <div class="row">
+                    <div class="col-6">
+                        <div class="row">
+                            <div class="col-3">
+                                <label for="item_name">Name</label>
+                            </div>
+                            <div class="col-3">
+                                <input type="text" name="item_name" id="item_name" required >
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-3">
+                                <label for="item_type">Type</label>
+                            </div>
+                            <div class="col-3">
+                                <input type="text" name="item_type" id="item_type" required >
+                            </div>
+                        </div>
+                        
+                        
+                        <div class="row">
+                            <div class="col-3">
+                                <label for="item_description">Description</label>
+                            </div>
+                            <div class="col-3">
+                                <input type="text" name="item_description" id="item_description" required >
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-3">
+                                <label for="item_price">Price</label>
+                            </div>
+                            <div class="col-3">
+                                <input type="text" name="item_price" id="item_price" required >
+                            </div>
+                        </div>
+                        
+                    </div>
+                    <div class="col-6">
+                        <div class="row">
+                            <div class="col-3">
+                                <label for="item_code">UPC Code</label>
+                            </div>
+                            <div class="col-3">
+                               <input type="text" name="item_code" id="item_code" required >
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-3">
+                                <label for="item_stock">Stock No</label>
+                            </div>
+                            <div class="col-3">
+                                <input type="text" name="item_stock" id="item_stock" required >
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-3">
+                                <label for="re_stock_value">Re-stock No</label>
+                            </div>
+                            <div class="col-3">
+                                <input type="text" name="re_stock_value" id="re_stock_value" >
+                            </div>
+                        </div>
+                        
+                    </div>
+                </div>
+                <br>
+                <button class="form_product_type" type="submit">
+                    <span class="form_upper_type_label">
+                        <h4 class="text-center" style="font-weight: bold; color:white">Add</h4>
+                    </span>
+                </button>
+            </form>
+        </div>
+        <p class="spacer" style="height: 18px;"></p>
+    </div>
+    <br>
+    
+    <div class="inventory-record-after-container4" id="inventory_listing_container">
+        <p class="spacer" style="height: 12px;"></p>
+        <h3 class="text-center" id="license_key_header"><b> inventory</b></h3>
+        <br>
+        <!-- button component for refreshing the page -->
+        <div class="product_type" onclick="window.location.reload()">
+            <span class="upper_type_label">
+                <h4 class="text-center" style="font-weight: bolder;">
+                    Refresh
+                    <span class="icon"><i class="fa fa-refresh"></i></span>
+                </h4>
+        </span>
+        </div>
+        <br>
+        <div class="info_pad">
+            <table style="width: 100%;" id="inventory_table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>UPC Code</th>
+                        <th>Type</th>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>Price</th>
+
+                        <th>Last Stock Entry</th> <!-- Add this column -->
+                        <th>Current Stock</th>
+                        <th>Re-stock Value</th>
+                        <th>Re-stock</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                {% for item in items %}
+                <tr>
+                    <td>{{ item.id }}</td>
+                    <td>{{ item.uid }}</td>
+                    <td>{{ item.item_type }}</td>
+                    <td>{{ item.name }}</td>
+                    <td>{{ item.description }}</td>
+                    <td>{{ item.price }}</td>
+
+                    <td>{{ item.last_stock_count }}</td> 
+                    <td>{{ item.current_stock_count }}</td> 
+                    <td>{{ item.re_stock_value }}</td>
+                    <td>{{ "Yes" if item.re_stock_status else "No" }}</td>
+                    
+                    <td>
+                        <div style="display: flex; justify-content: space-between;">
+                            <form action="/edit_item" method="post">
+                                <input type="hidden" name="item_uid" value="{{ item.uid }}">
+                                <button class="inventory_btn" type="submit" id="item_edit_btn">
+                                    <span class="form_upper_type_label">
+                                        <h4 class="text-center" style="font-weight: bold; color:white">Edit</h4>
+                                    </span>
+                                </button>
+                            </form>
+                            <form action="/delete_item_inventory" method="post">
+                                <input type="hidden" name="item_uid" value="{{ item.uid }}">
+                                <button class="inventory_btn" type="submit" id="item_delete_btn">
+                                    <span class="form_upper_type_label">
+                                        <h4 class="text-center" style="font-weight: bold; color:white">Delete</h4>
+                                    </span>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                    
+                </tr>
+                {% endfor %}
+            </table>
+            
+        </div>
+      
+        <p class="spacer" style="height: 2px;"></p>
+        <div class="product_type" onclick="window.location.href='/get_restock_printout';">
+            <span class="upper_type_label">
+                <h4 class="text-center" style="font-weight: bolder;">
+                    Re-stock
+                    <span class="icon"><i class="fa fa-print"></i></span>
+                </h4>
+            </span>
+        </div>
+
+        <br>
+        <h3 class="text-center" id="license_key_header"><b> Item Sale Record</b></h3>
+        <br>
+        <div class="sales_info_pad">
+            <table style="width: 100%;" id="sale_item_transaction_record_table">
+                <thead>
+                    <tr>
+                        
+                        <th>ID</th>
+                        <th>Item Code</th>
+                        <th>Item Name</th>
+                        <th>Transaction Type</th>
+                        <th>Quantity</th>
+                        <th>Sale Price</th>
+                        <th>Date Time</th>
+                    </tr>
+                </thead>
+                {% for sale in item_transactions -%}
+                <tr>
+        
+                    <td>{{ sale.id }}</td>
+                    <td>{{ sale.item_uid }}</td>
+                    <td>{{ SaleItem.query.filter_by(uid=sale.item_uid).first().name}}</td>
+                    <td>{{ sale.transaction_type}}</td>
+                    <td>{{ sale.transaction_quantity}}</td>
+                    <td>{{ sale.item_price}}</td>
+                    <td>{{ sale.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+                </tr>
+                {%- endfor %}
+            </table>
+        </div>
+        <!-- <div class="product_type"onclick="window.location.href='/get_sale_transaction_printout';">
+            <span class="upper_type_label">
+                <h4 class="text-center" style="font-weight: bolder;">
+                    Sale 
+                    <span class="icon"><i class="fa fa-print"></i></span>
+                </h4>
+            </span>
+        </div> -->
+        <br>
+        
+        <h3 class="text-center" id="license_key_header"><b> Total Sale Records</b></h3>
+        <br>
+        <div class="sales_info_pad">
+            <table style="width: 100%;" id="sales_record_table">
+                <thead>
+                    <tr>
+                        <th>Transaction ID</th>
+                        <th>ID</th>
+                        <th>Clerk</th>
+                        <th>Total</th>
+                        <th>Amount</th>
+                        <th>Change</th>
+                        <th>Payment Method</th>
+                        <th>Payment Reference</th>
+                        <th>Payment Gateway</th>
+                        <th>Date Time</th>
+                    </tr>
+                </thead>
+                {% for sale in sale_records -%}
+                <tr>
+                    <td>{{ sale.uid }}</td>
+                    <td>{{ sale.id }}</td>
+                    <td>{{ sale.sale_clerk }}</td>
+                    <td>{{ sale.sale_total }}</td>
+                    <td>{{ sale.sale_paid_amount }}</td>
+                    <td>{{ sale.sale_balance }}</td>
+                    <td>{{ sale.payment_method }}</td>
+                    <td>{{ sale.payment_reference }}</td>
+                    <td>{{ sale.payment_gateway }}</td>
+                    <td>{{ sale.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+                </tr>
+                {%- endfor %}
+            </table>
+        </div>
+        <div class="product_type" onclick="window.location.href='/get_sale_record_printout';">
+            <span class="upper_type_label">
+                <h4 class="text-center" style="font-weight: bolder;">
+                    Sales
+                    <span class="icon"><i class="fa fa-print"></i></span>
+                </h4>
+            </span>
+        </div>
+        <p class="spacer" style="height: 24px;"></p>
+    </div>
+    
+</div>
+<div class="footer" style="height: 60px;">
+    <p></p>
+</div>
+<script src="../static/js/main.js"></script>
+<script>
+    if (storageAvailable('localStorage')){
+        console.log("localstorage available in inventory page");
+    }
+    else {
+        console.log("localStorage not available in inventory page");
+    } 
+</script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+         var dataTable = new DataTable('#inventory_table');
+         var dataTable = new DataTable('#sale_item_transaction_record_table');
+         var dataTable = new DataTable('#sales_record_table');
+    });
+</script>
+{% endblock content %}
+

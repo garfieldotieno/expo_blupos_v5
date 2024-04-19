@@ -1,0 +1,407 @@
+{% extends 'side_nav_base.html' %}
+
+{% block content %}
+<br>
+<div class="container" style="position: relative; margin: auto;">
+    <div class="middle_container">
+
+        <!-- flash message component -->
+        {% if flash_message -%}
+            <div class="after-container4" id="flash_message_container">
+            <p class="spacer" style="height: 12px;">
+
+            </p>
+            <div class="info_pad" >
+                <div class="row">
+                    <div class="col-11">
+                        <p class="text-center">{{flash_payload}}</p>
+                    </div>
+                    <div class="col-1">
+                        <span class="" onclick="destroy_el()">
+                            <i class="fa fa-times-circle" style="font-weight: bolder;"></i>
+                        </span>
+                    </div>
+                </div>
+                
+            </div>
+            <p class="spacer" style="height: 18px;">
+
+            </p>
+            </div>
+
+            {%- endif %}
+
+        
+        <!-- check if sector_a is True -->
+        {% if sector_a -%}
+            <!-- sales/users button component -->
+            
+       
+            <!-- add user componet -->
+            <div class="after-container4">
+            <p class="spacer" style="height: 12px;">
+
+            </p>
+            <div class="info_pad">
+                <form action="/add_user" method="post" class="container">
+                    <div class="row">
+                        <div class="col-1">
+        
+                        </div>
+                        <div class="col-10">
+                            <h3 class="text-center"><b>Add User </b></h3>
+                            <br>
+                            
+                        </div>
+                        <div class="col-1">
+        
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class=col-6>
+                            <div class="">
+                                <label for=""> Role :</label>
+                                <select name="user_role" id="">
+                                    <option value="Sale">Sales</option>
+                                    <option value="Inventory">Inventory</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class=col-6>
+                            <div class="row">
+                                <div class="col-3">
+                                    <label for=""> Username</label>
+                                </div>
+                                <div class="col-3">
+                                    <input type="text" name="user_name" id="user_name" required>
+                                </div>  
+                            </div>
+                            <div class="row">
+                                <div class="col-3">
+                                    <label for=""> Password</label>
+                                </div>
+                                <div class="col-3">
+                                    <input type="password" name="password" id="password" required>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-3">
+                                    <label for=""> Confirm</label>
+                                </div>
+                                <div class="col-3">
+                                    <input type="password" name="confirm_password" id="confirm_password" onkeyup="pass_match()" onkeydown="pass_match()" required>
+                                </div>
+                            </div>
+                            <p id="password_warning" style="display: none;">
+                                Passwords don't match, enter password then confirm password
+                            </p>
+                        </div>
+                        
+                    </div>
+                    <br>
+                    <button class="form_product_type" type="submit" style="display: none;" id="user_submit_btn">
+                        <span class="form_upper_type_label">
+                            <h4 class="text-center" style="font-weight: bold; color:white">Add</h4>
+                        </span>
+                    </button>
+                </form>
+            </div>
+            <p class="spacer" style="height: 18px;">
+    
+            </p>
+            </div>
+
+            <!-- list table records component-->
+            <div class="after-container4" id="user_listing_container">
+            <p class="spacer" style="height: 12px;">
+
+            </p>
+            
+            <div class="info_pad">
+                <h3 class="text-center"><b>Accounts</b></h3>
+                <table style="width: 100%;" id="user_table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Username</th>
+                            <th>Role</th>
+                            <th>Login</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                   
+                        
+                            {% for user in users -%}
+                            <tr>
+                                <td>
+                                    {{user.id}}
+                                </td>
+                                <td>
+                                    {{user.user_name}}
+                                </td>
+                                <td>
+                                    {{user.role}}
+                                </td>
+                                <td>
+                                    {{user.updated_at}}
+                                </td>
+                                <td>
+                                    <!-- check if user type is admin and then pass creating the button but show for others -->
+                                    {% if user.role == 'Admin' -%}
+
+                                    {% else -%}
+                                        <form action="/delete_user" method="post">
+                                            <input type="hidden" name="user_id" value="{{user.id}}">
+                                            <button class="form_product_type" type="submit" id="user_delete_btn">
+                                                <span class="form_upper_type_label">
+                                                    <h4 class="text-center" style="font-weight: bold; color:white">Delete</h4>
+                                                </span>
+                                            </button>
+                                        </form>
+                                    {%- endif %}
+                                </td>
+                            </tr>
+                                
+                            {%- endfor %}
+                      
+                        
+                    
+                </table>
+            </div>
+            <p class="spacer" style="height: 18px;">
+
+            </p>
+            </div>
+        {% endif %}
+
+
+        <!-- check if sector_c is True-->
+        {% if sector_c -%}
+            <!-- license component -->
+            <div class="after-container4">
+            <p class="spacer" style="height: 12px;">
+
+            </p>
+
+            <!-- is not valid or no license component -->
+            <!-- check if license_record is None or license_record.license_status == False -->
+            {% if license_record == None %}
+
+            <!-- sector_c_a -->
+            <div class="info_pad license_valid_not_container">
+                <form action="/validate_reset_key" method="post" class="container">
+                    <div class="row">
+                        <div class="col-1">
+        
+                        </div>
+                        <div class="col-10">
+                            <h3 class="text-center" id="license_key_header"><b> Enter License Key</b></h3>
+                            <br>
+                            
+                        </div>
+                        <div class="col-1">
+        
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class=col-6>
+                            <div class="">
+                                <label for=""> Type :</label>
+                                <select name="license_type" id="">
+                                    <option value="Half">Half</option>
+                                    <option value="Full">Full</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class=col-6>
+                            <div class="row">
+                                <div class="col-3">
+                                    <label for=""> Key</label>
+                                </div>
+                                <div class="col-3">
+                                    <input type="text" name="reset_key" id="reset_key" maxlength="16" oninput="checkLicenseKeyLength(this)" >
+                                </div>  
+                            </div>
+                        </div>
+                        
+                    </div>
+                    <br>
+                    <button class="form_product_type" type="submit" style="display: none;" id="license_form_submit_btn">
+                        <span class="form_upper_type_label">
+                            <h4 class="text-center" style="font-weight: bold; color:white">Submit</h4>
+                        </span>
+                    </button>
+                </form>
+            </div>  
+
+            {% endif %}
+            
+            {% if license_record.license_status == False %}
+
+            <!-- sector_c_a -->
+            <div class="info_pad license_valid_not_container">
+                <form action="/validate_reset_key" method="post" class="container">
+                    <div class="row">
+                        <div class="col-1">
+        
+                        </div>
+                        <div class="col-10">
+                            <h3 class="text-center" id="license_key_header"><b> Enter License Key</b></h3>
+                            <br>
+                            
+                        </div>
+                        <div class="col-1">
+        
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class=col-6>
+                            <div class="">
+                                <label for=""> Type :</label>
+                                <select name="license_type" id="">
+                                    <option value="Half">Half</option>
+                                    <option value="Full">Full</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class=col-6>
+                            <div class="row">
+                                <div class="col-3">
+                                    <label for=""> Key</label>
+                                </div>
+                                <div class="col-3">
+                                    <input type="text" name="reset_key" id="reset_key" maxlength="16" oninput="checkLicenseKeyLength(this)" >
+                                </div>  
+                            </div>
+                        </div>
+                        
+                    </div>
+                    <br>
+                    <button class="form_product_type" type="submit" style="display: none;" id="license_form_submit_btn">
+                        <span class="form_upper_type_label">
+                            <h4 class="text-center" style="font-weight: bold; color:white">Submit</h4>
+                        </span>
+                    </button>
+                </form>
+            </div>
+
+            {% endif %}
+
+            <!-- is valid license component that shows the nencessary data using the same layout design -->
+            <!-- check if license_record.license_status == True and number of days remaining from today to expiry data > 10 days -->
+            
+            {% if license_record.license_status and days_remaining >= 10 %}
+            <!-- sector_c_b -->
+            <div class="info_pad license_valid_regular_container">
+                <!-- matching headline for license details -->
+                <h3 class="text-center" id="license_key_header"><b> License Details</b></h3>
+                <br>
+                <!-- display relevant license details in two columns -->
+                <div class="row">
+                    <div class="col-3">
+                        <p><b>License Type:</b></p> {{license_record.license_type}}</p>
+                    </div>
+                    <div class="col-3">
+                        <p><b>Remaining days:</b></p> {{days_remaining}}</p>  
+                    </div>
+                    <div class="col-3">
+                        <!-- license status as tansformed to Active or Expired -->
+                        <p><b>License Status:</b></p> {{license_record.license_status}}</p>
+                    </div>
+                    <div class="col-3">
+                        <p><b>Expiry_date:</b></p> {{license_record.license_expiry}}</p>  
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- is valid license component that shows countdown to expiry the same layout design -->
+            <!-- check if license_record.license_status == True and numbers of days remaining from today < 10 days  -->
+            {% if license_record.license_status and days_remaining < 10 %}
+            <!-- sector_c_c -->
+            <div class="info_pad license_valid_expiring_container">
+                <!-- matching headline for license details -->
+                <h3 class="text-center" id="license_key_header"><b> License Details</b></h3>
+                <br>
+                <!-- display relevant license details in two columns -->
+                <div class="row">
+                    <div class="col-3">
+                        <p><b>License Type:</b></p> {{license_record.license_type}}</p>
+                    </div>
+                    <div class="col-3">
+                        <p><b>Remaining days:</b></p> {{days_remaining}}</p>  
+                    </div>
+                    <div class="col-3">
+                        <!-- license status as tansformed to Active or Expired -->
+                        <p><b>License Status:</b></p> {{license_record.license_status}}</p>
+                    </div>
+                    <div class="col-3">
+                        <p><b>Expiry_date:</b></p> {{license_record.license_expiry}}</p>  
+                    </div>
+                </div>
+                <br>
+                <form action="/validate_reset_key" method="post" class="container">
+                    <div class="row">
+                        <div class="col-1">
+        
+                        </div>
+                        <div class="col-10">
+                            <h3 class="text-center" id="license_key_header"><b> Reset License</b></h3>
+                            <br>
+                            
+                        </div>
+                        <div class="col-1">
+        
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class=col-6>
+                            <div class="">
+                                <label for=""> Type :</label>
+                                <select name="license_type" id="">
+                                    <option value="Half">Half</option>
+                                    <option value="Full">Full</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class=col-6>
+                            <div class="row">
+                                <div class="col-3">
+                                    <label for=""> Key</label>
+                                </div>
+                                <div class="col-3">
+                                    <input type="text" name="reset_key" id="reset_key" maxlength="16" oninput="checkLicenseKeyLength(this)" >
+                                </div>  
+                            </div>
+                        </div>
+                        
+                    </div>
+                    <br>
+                    <button class="form_product_type" type="submit" style="display: none;" id="license_form_submit_btn">
+                        <span class="form_upper_type_label">
+                            <h4 class="text-center" style="font-weight: bold; color:white">Submit</h4>
+                        </span>
+                    </button>
+                </form>
+            </div>
+
+            {% endif %}
+            
+            <p class="spacer" style="height: 18px;">
+    
+            </p>
+            </div>
+        {% endif %}
+
+    </div>
+</div>
+<div class="footer" style="height: 60px;">
+    <p>
+    </p>
+</div>
+<script>
+ document.addEventListener('DOMContentLoaded', function() {
+      var dataTable = new DataTable('#user_table');
+    });
+</script>
+{% endblock content %}

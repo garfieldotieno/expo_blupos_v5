@@ -1,0 +1,369 @@
+{% extends 'side_nav_base.html' %}
+
+{% block content %}
+<br>
+<div class="contaiiner" style="position: relative; margin: auto;">
+    <div class="middle_container" id="sale_container">
+        
+        <div class="row">
+            <div class="col-6">
+                <div class="after-container4" id="sale_flash_message_container" style="display: none;">
+                    <p class="spacer" style="height: 12px;">
+        
+                    </p>
+                    <div class="info_pad" >
+                        <div class="row">
+                            <div class="col-11">
+                                <p class="text-center" id="message_board">Flash message</p>
+                            </div>
+                            <div class="col-1">
+                                <span class="" onclick="destroy_flash()">
+                                    <i class="fa fa-times-circle" style="font-weight: bolder;"></i>
+                                </span>
+                            </div>
+                        </div>
+                        
+                    </div>
+                    <p class="spacer" style="height: 18px;">
+        
+                    </p>
+                </div>
+                <div class="after-container4">
+                    <p class="spacer" style="height: 12px;">
+        
+                    </p>
+                    <div class="info_pad" id="auto_sale">
+                        <div class="container" >
+                            <h3 class="text-center"><b>Auto Sale</b></h3>
+                                    <br> 
+                                    
+                                    <br>
+                                    <label for=""> Code</label>
+
+                                    <input type="text"  id="code_input" onchange="upload_item_code()" autofocus>
+
+                        </div>
+                        
+                    </div>
+                    <div class="info_pad" id="manual_sale" style="display: none;">
+                        <div class="container" >
+                            <h3 class="text-center"><b>Manual Sale</b></h3>
+                                    <br> 
+                                    
+                                    <br>
+                                    <label for=""> Code</label>
+                                    <input type="text"  id="code_input2" autofocus>
+
+                                    <button class="form_product_type" type="submit" onclick="upload_item_code2()">
+                                        <span class="form_upper_type_label">
+                                            <h4 class="text-center" style="font-weight: bold; color:white">Submit</h4>
+                                        </span>
+                                    </button>
+
+                        </div>
+                    </div>
+                    <div class="product_type" id="switch_btn" onclick="switch_input_mode()">
+                        <span class="upper_type_label">
+                            <h4 class="text-center" style="font-weight: bolder;">Manual</h4>
+                        </span>
+                    </div>
+                    <p class="spacer" style="height: 18px;">
+            
+                    </p>
+                </div>  
+            </div>
+            <div class="col-6">
+                <div class="after-container4" id="item_listing_container">
+                    <p class="spacer" style="height: 12px;">
+        
+                    </p>
+                    <div class="info_pad">
+                        <h2 class="text-center" style=" font-weight: 600;" id="totals_heading"></h2>
+                        <table style="width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th>Id</th>
+                                    <th>Name</th>
+                                    <th>Price</th>
+                                    <th>Action</th>
+                                </tr>
+                                
+                            </thead>
+                            <tbody id="tbody">
+                                
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="spacer" style="height: 18px;">
+        
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="after-container4" id="checkout_section" >
+            <p class="spacer" style="height: 2px;">
+                
+            </p>
+            <div class="product_type" onclick="switch_to_checkout()">
+                <span class="upper_type_label">
+                    <h4 class="text-center" style="font-weight: bolder;">Checkout</h4>
+                </span>
+            </div>
+            <p class="spacer" style="height: 8px;">
+                
+            </p>
+        </div>
+
+    </div>
+    <div class="middle_container" id="checkout_container" style="display: none;">
+        <div class="after-container4" id="back_button_container">
+            <p class="spacer" style="height: 2px;">
+                
+            </p>
+            <div class="product_type" onclick="switch_back_from_checkout()" id="backout_btn">
+                <span class="upper_type_label">
+                    <h4 class="text-center" style="font-weight: bolder;">Back</h4>
+                </span>
+            </div>
+            <p class="spacer" style="height: 8px;">
+                
+            </p>
+        </div>
+
+        <div class="row">
+            <div class="col-4">
+                <div class="info_pad" id="print_template">
+                    <br>
+                    <img src="static/assets/{{shop_data[0]['shop_banner_one']}}" alt="" style="width: 50px; height: 50px; position: relative; left: 42%;">
+                    <p class="text-center">{{shop_data[0]['pos_shop_name']}}</p>
+                    <p class="text-center">{{shop_data[0]['pos_shop_call_number']}}</p>
+                    <p class="text-center">{{shop_data[0]['pos_shop_email']}}</p>
+                    <p class="text-center">{{shop_data[0]['shop_adress']}}</p>
+                    <p class="text-center">Served by: {{user_name['user_name']}}</p>
+                    
+                    <!-- <p class="text-center"><b>Served by: Saleguy</b></p> -->
+                    <span>--------------------------------------</span>
+                    <div id="sale_listing">
+                        <table style="width:100%">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Item</th>
+                                    <th>Price</th>
+                                </tr>
+                            </thead>
+                            <tbody id="checkout_items_table_body">
+                                
+                             
+                                
+                            </tbody>
+                        </table>
+                        <br>
+                        <span>--------------------------------------</span>
+                        <!-- totals and vat section -->
+                        <table style="width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th></th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr id="sub_total_row">
+
+                                </tr>
+                                <tr id="vat_total_row">
+                                    
+                                </tr>
+                                <tr id="total_row">
+                                
+                                </tr>
+                                <tr></tr>
+                                <tr></tr>
+                                <tr id="cash_row">
+                                    
+                                </tr>
+                                <tr id="change_row">
+                                    
+                                </tr>
+                            </tbody>
+                        </table>
+                        <br>
+                        
+                        <span>--------------------------------------</span>
+                        <!-- codes section -->
+                        
+
+                        <h6 class="text-center" id="tranx_code"></h6>
+
+                        <img src="" alt="" id="barcode_area">
+                        <br>
+                        <br>
+                        <div id="qrcode_area"></div>
+                        <style>
+                            /* CSS to center the QR code area */
+                            #qrcode_area {
+                                display: flex;
+                                justify-content: center; /* Center horizontally */
+                                align-items: center; /* Center vertically */
+                            }
+                        </style>
+
+                        <br>
+                        <br>
+                        <span>--------------------------------------</span>
+                        <br>
+                        <br>
+                        <h6 class="" style="position: relative;" id="serve_time"></h6>
+                        <h6 class="" style="position: relative;" id="bye_bye">Thanks for shopping with us!</h6>
+                        
+                    </div>
+                    
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="info_pad" id="checkout_sale">
+                            <!-- ... Rest of your HTML code ... -->
+
+                <div class="container">
+                <h3 class="text-center"><b>Choose Payment</b></h3>
+                <br>
+                <br>
+                <label for="payment_method">Payment Method</label>
+                <select id="payment_method" onchange="togglePaymentFields()">
+                    <option value="cash">Cash</option>
+                    <option value="mpesa">Mpesa</option>
+                </select>
+                <input type="hidden" name="recording_user" id="recording_user" value="{{user_name['user_name']}}">
+                <br>
+                <div id="cash_fields" style="display: none;">
+                    <!-- Your cash-related fields here -->
+                    <!-- For example, input field for cash payment -->
+                    <label for="checkout_payment_input">Cash Payment</label>
+                    <input type="text" id="checkout_payment_input" autofocus>
+                    <br>
+                </div>
+                <div id="mpesa_fields" style="display: none;">
+                    <!-- Your MPESA-related fields here -->
+                    <label for="mpesa_gateway">MPESA Gateway</label>
+                    <select id="mpesa_gateway">
+                        <option value="223111-476921">223111-476921</option>
+                        <option value="400200-6354">400200-6354</option>
+                        <option value="765244-80872">765244-80872</option>
+                    </select>
+                    <br>
+                    <!-- Display payment input for MPESA as well -->
+                    <label for="mpesa_payment_input">MPESA Payment</label>
+                    <input type="text" id="mpesa_payment_input">
+                    <br>
+                    <!-- Display payment input for MPESA as well -->
+                    <label for="mpesa_reference_input">MPESA Ref</label>
+                    <input type="text" id="mpesa_reference_input">
+                    <br>
+                </div>
+                <p class="text-center" id="input_error" style="display: none;">Invalid input !</p>
+                <br>
+                <h6 class="text-center" id="sale_payment"></h6>
+                <h6 class="text-center" id="sale_total_display2"></h6>
+                <h6 class="text-center" id="sale_change_display"><b>Change: 0.00</b></h6>
+                </div>
+
+<!-- ... Rest of your HTML code ... -->
+
+                </div>
+                <br>
+                <br>
+                <div class="after-container4" id="add_btn_container" >
+                    <p class="spacer" style="height: 2px;">
+                        
+                    </p>
+                    <div class="product_type" onclick="update_payment()">
+                        <span class="upper_type_label">
+                            <h4 class="text-center" style="font-weight: bolder;">Add</h4>
+                        </span>
+                    </div>
+                    <p class="spacer" style="height: 8px;">
+                        
+                    </p>
+                </div>
+                <br>
+                <div class="after-container4" id="checkout_button_container" style="display: none;">
+                    <p class="spacer" style="height: 2px;">
+                        
+                    </p>
+                    <div class="product_type" onclick="add_sale_record()">
+                        <span class="upper_type_label">
+                            <h4 class="text-center" style="font-weight: bolder;">Checkout</h4>
+                        </span>
+                    </div>
+                    <p class="spacer" style="height: 8px;">
+                        
+                    </p>
+                </div>
+                <div class="after-container4" id="print_button_container" style="display: none; position: relative; top: 35%;">
+                    <p class="spacer" style="height: 2px;">
+                        
+                    </p>
+                    
+                    <div class="product_type" onclick="print_sale_receipt()">
+                        <span class="upper_type_label">
+                            <h4 class="text-center" style="font-weight: bolder;">Print</h4>
+                        </span>
+                    </div>
+                    <p class="spacer" style="height: 8px;">
+                        
+                    </p>
+                </div>
+            </div>
+        </div>
+        <br>
+        <br>
+        <div class="after-container4" id="clear_button_container" style="display:none;">
+            <p class="spacer" style="height: 2px;">
+                
+            </p>
+            <div class="product_type" onclick="clear_sale()">
+                <span class="upper_type_label">
+                    <h4 class="text-center" style="font-weight: bolder;">Clear</h4>
+                </span>
+            </div>
+            
+            <p class="spacer" style="height: 8px;">
+                
+            </p>
+        </div>
+    </div>
+</div>
+
+
+<div class="footer" style="height: 60px;">
+    <p>
+    </p>
+</div>
+<script src="../static/node_modules/print-js/dist/print.js"></script>
+
+<script src="../static/js/main.js"></script>
+<script>
+    function print_sale_receipt(){
+        printJS('print_template', 'html')
+    }
+</script>
+<script >
+    if (storageAvailable('localStorage')){
+        console.log("localstorage available in sales page")
+        let sale_object = JSON.parse(localStorage.getItem('current_items_pack'))
+
+        if(sale_object != null)  {
+            display_items()
+        }
+        else{
+            reset_app()
+        }
+        }
+    else {
+    console.log("localStorage not available in sales page")
+    } 
+</script>
+
+{% endblock content %}
