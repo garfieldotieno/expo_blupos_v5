@@ -503,32 +503,43 @@ function add_sale_record() {
     })
     .then(data => {
         console.log(data);
-        if (data.status === 'failed') {
+        if (data.status === false || data.status === 'failed') {
             console.log('Sale record addition failed');
-            // You can choose to display an error message or take other actions here
+            // Display error message to user
+            const errorMessage = data.error || 'Sale failed due to unknown error';
+            flash_message(`❌ Sale Failed: ${errorMessage}`);
+            return;
         } else {
             console.log('Sale record added successfully');
-            const elementsToHide = [
-                'back_button_container',
-                'checkout_sale',
-                'add_btn_container',
-                'checkout_button_container'
-            ];
-            const elementsToShow = ['clear_button_container', 'print_button_container'];
+            // Store the sale_id for PDF download
+            if (data.sale_record && data.sale_record.id) {
+                localStorage.setItem('last_sale_id', data.sale_record.id);
 
-            elementsToHide.forEach(id => {
-                const element = document.getElementById(id);
-                if (element) {
-                    element.style.display = 'none';
-                }
-            });
+                const elementsToHide = [
+                    'back_button_container',
+                    'checkout_sale',
+                    'add_btn_container',
+                    'checkout_button_container'
+                ];
+                const elementsToShow = ['clear_button_container', 'print_button_container'];
 
-            elementsToShow.forEach(id => {
-                const element = document.getElementById(id);
-                if (element) {
-                    element.style.display = 'block';
-                }
-            });
+                elementsToHide.forEach(id => {
+                    const element = document.getElementById(id);
+                    if (element) {
+                        element.style.display = 'none';
+                    }
+                });
+
+                elementsToShow.forEach(id => {
+                    const element = document.getElementById(id);
+                    if (element) {
+                        element.style.display = 'block';
+                    }
+                });
+            } else {
+                console.error('Sale record added but no sale_record data returned');
+                flash_message('❌ Sale completed but receipt data is missing');
+            }
         }
     })
     .catch(error => {
@@ -672,6 +683,32 @@ function init_users(key) {
 }
 
 
+
+function download_sale_receipt() {
+    console.log("Starting receipt print display");
+
+    const saleId = localStorage.getItem('last_sale_id');
+    if (!saleId) {
+        console.error("No sale ID found for receipt display");
+        flash_message("Error: No sale record found for display");
+        return;
+    }
+
+    const currentOrigin = window.location.origin;
+    const printUrl = `${currentOrigin}/download-sale-receipt/${saleId}?format=print`;
+
+    // Open receipt in new window/tab for printing
+    const printWindow = window.open(printUrl, '_blank', 'width=400,height=600,scrollbars=yes,resizable=yes');
+
+    // Focus the new window
+    if (printWindow) {
+        printWindow.focus();
+        console.log(`Receipt display initiated for sale ID: ${saleId}`);
+    } else {
+        console.error("Failed to open print window - popup blocker may be active");
+        flash_message("Error: Could not open receipt window. Please disable popup blocker and try again.");
+    }
+}
 
 function start_pdf_export() {
     console.log("Starting PDF export");

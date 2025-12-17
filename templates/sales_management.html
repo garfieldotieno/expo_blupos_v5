@@ -131,7 +131,7 @@
         </div>
 
         <div class="row">
-            <div class="col-4">
+            <div class="col-6">
                 <div class="info_pad" id="print_template">
                     <br>
                     <img src="static/assets/{{shop_data[0]['shop_banner_one']}}" alt="" style="width: 50px; height: 50px; position: relative; left: 42%;">
@@ -222,7 +222,7 @@
                     
                 </div>
             </div>
-            <div class="col-6">
+            <div class="col-4">
                 <div class="info_pad" id="checkout_sale">
                             <!-- ... Rest of your HTML code ... -->
 
@@ -303,36 +303,29 @@
                 </div>
                 <div class="after-container4" id="print_button_container" style="display: none; position: relative; top: 35%;">
                     <p class="spacer" style="height: 2px;">
-                        
+
                     </p>
-                    
-                    <div class="product_type" onclick="print_sale_receipt()">
+
+                    <div class="product_type" onclick="download_sale_receipt()">
                         <span class="upper_type_label">
                             <h4 class="text-center" style="font-weight: bolder;">Print</h4>
                         </span>
                     </div>
                     <p class="spacer" style="height: 8px;">
-                        
+
+                    </p>
+                    <div class="product_type" onclick="clear_sale()">
+                        <span class="upper_type_label">
+                            <h4 class="text-center" style="font-weight: bolder;">Clear</h4>
+                        </span>
+                    </div>
+                    <p class="spacer" style="height: 8px;">
+
                     </p>
                 </div>
             </div>
         </div>
-        <br>
-        <br>
-        <div class="after-container4" id="clear_button_container" style="display:none;">
-            <p class="spacer" style="height: 2px;">
-                
-            </p>
-            <div class="product_type" onclick="clear_sale()">
-                <span class="upper_type_label">
-                    <h4 class="text-center" style="font-weight: bolder;">Clear</h4>
-                </span>
-            </div>
-            
-            <p class="spacer" style="height: 8px;">
-                
-            </p>
-        </div>
+
     </div>
 </div>
 

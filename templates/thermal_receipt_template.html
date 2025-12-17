@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Thermal Receipt</title>
+    <style>
+        @page {
+            size: 80mm 297mm; /* 80mm width thermal paper */
+            margin: 2mm;
+        }
+        body {
+            font-family: 'Courier New', monospace;
+            font-size: 9px;
+            line-height: 1.2;
+            color: #000;
+            margin: 0;
+            padding: 2mm;
+            width: 76mm; /* 80mm - 4mm margins */
+            word-wrap: break-word;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 1px dashed #000;
+            padding-bottom: 3mm;
+            margin-bottom: 3mm;
+        }
+        .header img {
+            max-width: 20mm;
+            max-height: 15mm;
+            margin-bottom: 2mm;
+        }
+        .header h1 {
+            margin: 1mm 0;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .header p {
+            margin: 0.5mm 0;
+            font-size: 8px;
+        }
+        .section {
+            margin-bottom: 3mm;
+        }
+        .section h3 {
+            font-size: 10px;
+            font-weight: bold;
+            margin: 0 0 2mm 0;
+            padding-bottom: 1mm;
+            border-bottom: 1px dashed #ccc;
+        }
+        .info-table {
+            width: 100%;
+            margin-bottom: 2mm;
+        }
+        .info-table td {
+            padding: 0.5mm 0;
+            vertical-align: top;
+            font-size: 8px;
+        }
+        .info-table .label {
+            font-weight: bold;
+            width: 40%;
+            padding-right: 2mm;
+        }
+        .info-table .value {
+            width: 60%;
+        }
+        .items-section {
+            margin: 3mm 0;
+        }
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 8px;
+        }
+        .items-table th,
+        .items-table td {
+            border: none;
+            padding: 1mm 0.5mm;
+            text-align: left;
+        }
+        .items-table th {
+            font-weight: bold;
+            font-size: 9px;
+            border-bottom: 1px dashed #000;
+        }
+        .items-table .text-right {
+            text-align: right;
+        }
+        .items-table .text-center {
+            text-align: center;
+        }
+        .codes-section {
+            text-align: center;
+            margin: 3mm 0;
+            border-top: 1px dashed #000;
+            padding-top: 2mm;
+        }
+        .barcode {
+            margin: 2mm 0;
+        }
+        .barcode img {
+            max-width: 60mm;
+            height: auto;
+        }
+        .qrcode {
+            margin: 2mm 0;
+        }
+        .qrcode img {
+            width: 20mm;
+            height: 20mm;
+        }
+        .footer {
+            margin-top: 3mm;
+            text-align: center;
+            border-top: 1px dashed #000;
+            padding-top: 2mm;
+            font-size: 7px;
+        }
+        .footer p {
+            margin: 1mm 0;
+        }
+        .divider {
+            border-top: 1px dashed #000;
+            margin: 2mm 0;
+        }
+        .otp-section {
+            background-color: #f0f0f0;
+            padding: 2mm;
+            margin: 2mm 0;
+            border: 1px solid #000;
+            text-align: center;
+        }
+        .otp-code {
+            font-size: 14px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            color: #d00;
+        }
+        .thermal-optimized {
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <img src="/static/assets/{{ shop_data[0]['shop_banner_one'] }}" alt="Shop Logo">
+        <h1>{{ shop_data[0]['pos_shop_name'] }}</h1>
+        <p>{{ shop_data[0]['shop_adress'] }}</p>
+        <p>Tel: {{ shop_data[0]['pos_shop_call_number'] }}</p>
+    </div>
+
+    {% if otp_code %}
+    <div class="otp-section">
+        <p><strong>OTP VERIFICATION REQUIRED</strong></p>
+        <p class="otp-code">{{ otp_code }}</p>
+        <p>Expires: {{ otp_expires_at.strftime('%H:%M:%S') }}</p>
+    </div>
+    {% endif %}
+
+    <div class="section">
+        <h3>PAYMENT CONFIRMATION</h3>
+        <table class="info-table">
+            <tr>
+                <td class="label">Receipt ID:</td>
+                <td class="value">{{ receipt.uid }}</td>
+            </tr>
+            <tr>
+                <td class="label">Payment ID:</td>
+                <td class="value">{{ payment_confirmation.uid }}</td>
+            </tr>
+            <tr>
+                <td class="label">Amount:</td>
+                <td class="value">${{ "%.2f"|format(payment_confirmation.amount) }}</td>
+            </tr>
+            <tr>
+                <td class="label">Payment Method:</td>
+                <td class="value">{{ payment_confirmation.payment_method }}</td>
+            </tr>
+            <tr>
+                <td class="label">Reference:</td>
+                <td class="value">{{ payment_confirmation.payment_reference or 'N/A' }}</td>
+            </tr>
+            <tr>
+                <td class="label">Status:</td>
+                <td class="value">{{ payment_confirmation.status.upper() }}</td>
+            </tr>
+            <tr>
+                <td class="label">Date:</td>
+                <td class="value">{{ payment_confirmation.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            </tr>
+        </table>
+    </div>
+
+    {% if customer_info %}
+    <div class="section">
+        <h3>CUSTOMER INFO</h3>
+        <table class="info-table">
+            {% for key, value in customer_info.items() %}
+            <tr>
+                <td class="label">{{ key|title }}:</td>
+                <td class="value">{{ value }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+    {% endif %}
+
+    <div class="items-section">
+        <h3>TRANSACTION DETAILS</h3>
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th style="width: 10%;">#</th>
+                    <th style="width: 60%;">Description</th>
+                    <th style="width: 15%;" class="text-right">Qty</th>
+                    <th style="width: 15%;" class="text-right">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in receipt_items %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ item.description }}</td>
+                    <td class="text-right">{{ item.quantity }}</td>
+                    <td class="text-right">${{ "%.2f"|format(item.amount) }}</td>
+                </tr>
+                {% endfor %}
+                <tr class="divider">
+                    <td colspan="4"></td>
+                </tr>
+                <tr>
+                    <td colspan="3" style="text-align: right; font-weight: bold;">TOTAL:</td>
+                    <td class="text-right" style="font-weight: bold;">${{ "%.2f"|format(payment_confirmation.amount) }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h3>RECEIPT INFO</h3>
+        <table class="info-table">
+            <tr>
+                <td class="label">Receipt Code:</td>
+                <td class="value">{{ receipt.uid }}</td>
+            </tr>
+            <tr>
+                <td class="label">EAN-13:</td>
+                <td class="value">{{ receipt.ean13_barcode }}</td>
+            </tr>
+            <tr>
+                <td class="label">Generated:</td>
+                <td class="value">{{ current_time }}</td>
+            </tr>
+            {% if receipt.otp_verified %}
+            <tr>
+                <td class="label">OTP Verified:</td>
+                <td class="value">YES</td>
+            </tr>
+            {% endif %}
+        </table>
+    </div>
+
+    <div class="codes-section">
+        {% if ean13_barcode_base64 %}
+        <div class="barcode">
+            <img src="data:image/png;base64,{{ ean13_barcode_base64 }}" alt="EAN-13 Barcode">
+        </div>
+        {% endif %}
+        {% if qrcode_base64 %}
+        <div class="qrcode">
+            <img src="data:image/png;base64,{{ qrcode_base64 }}" alt="QR Code">
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="footer">
+        <p>*** Blu Property Receipt System ***</p>
+        <p>Thank you for your business!</p>
+        <p>This receipt is valid only with OTP verification.</p>
+        <p>Generated on thermal printer - 80mm width</p>
+    </div>
+</body>
+</html>

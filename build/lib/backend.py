@@ -2,7 +2,7 @@ from enum import unique
 import json
 from flask import Flask, render_template, request, abort, redirect, make_response, url_for, session, send_file, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 import os
 import string, random
 from flask_sqlalchemy import SQLAlchemy
@@ -12,16 +12,12 @@ from flask_cors import CORS
 from reportlab.lib.pagesizes import landscape, letter
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, PageBreak, Image as RLImage
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, PageBreak
 from io import BytesIO
 
 import pydantic
 import yaml
 import hashlib
-
-from xhtml2pdf import pisa
-import qrcode
-import base64
 
 __version__ = "1.0.0"
 
@@ -92,20 +88,6 @@ class License(db.Model):
         return f"License(id={self.id}, uid='{self.uid}', license_key='{self.license_key}', license_type='{self.license_type}', license_status='{self.license_status}', license_expiry='{self.license_expiry}', created_at={self.created_at}, updated_at={self.updated_at})"
 
 def create_license(payload):
-    # Input validation
-    required_fields = ['license_key', 'license_type', 'license_status', 'license_expiry']
-    for field in required_fields:
-        if field not in payload:
-            return {"status": False, "error": f"Missing required field: {field}"}
-
-    # Validate license type
-    if payload['license_type'] not in ['Full', 'Half']:
-        return {"status": False, "error": "Invalid license type. Must be 'Full' or 'Half'"}
-
-    # Validate license key format (should be string)
-    if not isinstance(payload['license_key'], str) or len(payload['license_key']) == 0:
-        return {"status": False, "error": "Invalid license key"}
-
     # update so that there can only be one record
     license = License()
     license.uid = randomString(16)
@@ -114,20 +96,16 @@ def create_license(payload):
     license.license_status = payload['license_status']
     license.license_expiry = payload['license_expiry']
 
-    try:
-        # check length of records, if empty add, if one, delete and create new
-        if License.query.all() == []:
-            db.session.add(license)
-            db.session.commit()
-            return {"status": True}
-        else:
-            delete_license(1)
-            db.session.add(license)
-            db.session.commit()
-            return {"status": True}
-    except Exception as e:
-        db.session.rollback()
-        return {"status": False, "error": f"Database error: {str(e)}"}
+    # check length of records, if empty add, if one, delete and create new
+    if License.query.all() == []:
+        db.session.add(license)
+        db.session.commit()
+        return {"status":True}
+    else:
+        delete_license(1)
+        db.session.add(license)
+        db.session.commit()
+        return {"status":True}
 
 
 
@@ -663,7 +641,6 @@ def get_sale_record_printout():
 
 class SaleItemTransaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    sale_id = db.Column(db.Integer, db.ForeignKey('sale_record.id'), nullable=True)
     item_uid = db.Column(db.String(16), nullable=False)
     transaction_type = db.Column(db.Enum('Purchase', 'Sale'), nullable=False)
     transaction_quantity = db.Column(db.Integer, nullable=False)
@@ -774,64 +751,27 @@ def add_clerk_sale_record():
     items_sold = []
     item_array = json_data['items_array']
     print(f"item_arr is ot type {type(item_array)}")
-
-    # create sale record first to get the sale_id
-    sale_record = SaleRecord()
-    sale_record.uid = randomString(10)
-    sale_record.sale_clerk = json_data['sale_clerk']
-    sale_record.sale_total = json_data['sale_total']
-    sale_record.sale_paid_amount = json_data['sale_paid_amount']
-    sale_record.sale_balance = json_data['sale_balance']
-    sale_record.payment_method = json_data.get('payment_method')
-    sale_record.payment_reference = json_data.get('payment_reference')
-    sale_record.payment_gateway = json_data.get('payment_gateway')
-    db.session.add(sale_record)
-    db.session.commit()
-
-    # sale item transactions linked to the sale
+    
+    # sale item transactions
     for it in item_array:
         print("adding sale-item-transactions---")
 
         item_transaction = SaleItemTransaction()
         sale_item = SaleItem.query.filter_by(id=int(it.split(":")[0])).first()
         print(f"found sale item {sale_item}")
-        if sale_item is None:
-            print(f"Item with ID {int(it.split(':')[0])} not found. Available items:")
-            all_items = SaleItem.query.all()
-            for item in all_items:
-                print(f"  ID: {item.id}, Name: {item.name}, UID: {item.uid}")
-            continue
 
-        item_transaction.sale_id = sale_record.id
         item_transaction.item_uid = sale_item.uid
         item_transaction.transaction_type = 'Purchase'
         item_transaction.transaction_quantity = 1
         item_transaction.item_price = sale_item.price
         db.session.add(item_transaction)
         db.session.commit()
-
-    # Check stock availability before updating
-    for it in item_array:
-        sale_item = SaleItem.query.filter_by(id=int(it.split(":")[0])).first()
-        if sale_item is None:
-            print(f"Item with ID {int(it.split(':')[0])} not found during stock check")
-            continue
-
-        stock = SaleItemStockCount.query.filter_by(item_uid=sale_item.uid).first()
-        if stock is None or stock.current_stock_count < 1:
-            print(f"Insufficient stock for item {sale_item.name}: current_stock_count={stock.current_stock_count if stock else 'N/A'}")
-            # Rollback the transaction
-            db.session.rollback()
-            return {'status': False, 'error': f'Insufficient stock for {sale_item.name}'}
-
-    # update stock count only if all items have sufficient stock
+    
+    # update stock count
     for it in item_array:
         print("updating item stock count---")
         sale_item = SaleItem.query.filter_by(id=int(it.split(":")[0])).first()
         print(f"found sale during stock update item {sale_item}")
-        if sale_item is None:
-            print(f"Item with ID {int(it.split(':')[0])} not found during stock update")
-            continue
 
         stock = SaleItemStockCount.query.filter_by(item_uid=sale_item.uid).first()
         print(f"found stock {stock}")
@@ -839,10 +779,16 @@ def add_clerk_sale_record():
         stock.current_stock_count -= 1
 
         db.session.add(stock)
+        db.session.commit()
 
-    db.session.commit()
+    # create sale record
+    try:
+        add_sale_record(json_data)
+    except Exception as e:
+        print(f"unable to add sale record because : {e}")
 
-    return {'status': True, 'sale_record': {'id': sale_record.id, 'uid': sale_record.uid}}
+
+    return {'status':True}
 
 
 
@@ -999,7 +945,7 @@ def user_home():
                     sector_a = True,
                     sector_c = True,
                     license_record = license,
-                    days_remaining = (license.license_expiry.replace(tzinfo=timezone.utc) - datetime.now(timezone.utc)).days,
+                    days_remaining = (license.license_expiry - datetime.now()).days,
                     user_type=session['session_user'].decode('utf-8'),
                     user_name=user_from_session(),
                     shop_data = [load_shop_data()],
@@ -1016,7 +962,7 @@ def user_home():
                     sector_a = False,
                     sector_c = True,
                     license_record = license,
-                    days_remaining = (license.license_expiry.replace(tzinfo=timezone.utc) - datetime.now(timezone.utc)).days,
+                    days_remaining = (license.license_expiry - datetime.now()).days,
                     user_type=session['session_user'].decode('utf-8'),
                     user_name=user_from_session(),
                     shop_data = [load_shop_data()],
@@ -1135,20 +1081,6 @@ def init_app_db():
     create_user(master_user)
     create_user(sales_user)
     create_user(inventory_user)
-
-    # Create test items
-    test_item1 = {"item_code": "TEST001", "item_name": "Test Item 1", "item_description": "A test item", "item_price": 50.0, "item_type": "Test"}
-    test_item2 = {"item_code": "TEST002", "item_name": "Royal Strawberry Yoghurt 500ml", "item_description": "Strawberry yoghurt", "item_price": 100.0, "item_type": "Dairy"}
-    test_item3 = {"item_code": "TEST003", "item_name": "Test Item 3", "item_description": "Another test item", "item_price": 75.0, "item_type": "Test"}
-
-    create_sale_item(test_item1)
-    create_sale_item(test_item2)
-    create_sale_item(test_item3)
-
-    # Create stock for items
-    update_sale_item_stock_count({"item_code": "TEST001", "item_stock": 10, "re_stock_value": 5})
-    update_sale_item_stock_count({"item_code": "TEST002", "item_stock": 20, "re_stock_value": 10})
-    update_sale_item_stock_count({"item_code": "TEST003", "item_stock": 15, "re_stock_value": 8})
     
 
 
@@ -1156,303 +1088,6 @@ def init_app_db():
 
 
 # create new function run to determine between development and production mode as fed in the arguments when executing this file
-
-def generate_barcode_image(data):
-    try:
-        from PIL import Image, ImageDraw, ImageFont
-
-        # Create a simple barcode-like image with text and lines
-        img = Image.new('RGB', (200, 60), color='white')
-        draw = ImageDraw.Draw(img)
-
-        # Try to use default font
-        try:
-            font = ImageFont.load_default()
-        except:
-            font = None
-
-        # Draw some barcode-like lines
-        for i in range(0, 180, 4):
-            if i % 8 == 0:  # Create alternating thick/thin lines
-                draw.rectangle([10 + i, 10, 12 + i, 50], fill='black')
-            else:
-                draw.rectangle([10 + i, 15, 11 + i, 45], fill='black')
-
-        # Draw the barcode data as text below
-        draw.text((60, 35), data[:12], fill='black', font=font)
-
-        print("Barcode image generation successful - simple visual representation")
-        return img
-    except Exception as e:
-        print(f"Barcode image generation failed: {e}")
-        return None
-
-def generate_qrcode_image(data):
-    try:
-        qr = qrcode.QRCode(version=1, box_size=10, border=4)
-        qr.add_data(data)
-        qr.make(fit=True)
-        img = qr.make_image(fill_color="black", back_color="white")
-        print("QR code image generation successful")
-        return img
-    except Exception as e:
-        print(f"QR code image generation failed: {e}")
-        return None
-
-def generate_barcode_base64(data):
-    try:
-        from PIL import Image, ImageDraw, ImageFont
-        import io
-
-        # Create a simple barcode-like image with text and lines
-        img = Image.new('RGB', (200, 60), color='white')
-        draw = ImageDraw.Draw(img)
-
-        # Try to use default font
-        try:
-            font = ImageFont.load_default()
-        except:
-            font = None
-
-        # Draw some barcode-like lines
-        for i in range(0, 180, 4):
-            if i % 8 == 0:  # Create alternating thick/thin lines
-                draw.rectangle([10 + i, 10, 12 + i, 50], fill='black')
-            else:
-                draw.rectangle([10 + i, 15, 11 + i, 45], fill='black')
-
-        # Draw the barcode data as text below
-        draw.text((60, 35), data[:12], fill='black', font=font)
-
-        # Convert to base64
-        buffer = io.BytesIO()
-        img.save(buffer, format='PNG')
-        buffer.seek(0)
-        image_base64 = base64.b64encode(buffer.read()).decode('utf-8')
-        print("Barcode generation successful - simple visual representation")
-        return f"data:image/png;base64,{image_base64}"
-    except Exception as e:
-        print(f"Barcode generation failed: {e}")
-        return None
-
-def generate_qrcode_base64(data):
-    qr = qrcode.QRCode(version=1, box_size=10, border=4)
-    qr.add_data(data)
-    qr.make(fit=True)
-    img = qr.make_image(fill_color="black", back_color="white")
-    buffer = BytesIO()
-    img.save(buffer, format='PNG')
-    buffer.seek(0)
-    image_base64 = base64.b64encode(buffer.read()).decode('utf-8')
-    return f"data:image/png;base64,{image_base64}"
-
-
-@app.route('/download-sale-receipt/<int:sale_id>')
-def download_sale_receipt(sale_id):
-    # Check if request wants HTML for printing (from print dialog)
-    if request.args.get('format') == 'print':
-        # Return HTML for browser printing
-        sale_record = SaleRecord.query.filter_by(id=sale_id).first()
-        if not sale_record:
-            abort(404, description="Sale record not found")
-
-        # Fetch sale items from transactions linked to this sale
-        sale_items = []
-        transactions = SaleItemTransaction.query.filter_by(sale_id=sale_id).all()
-        for transaction in transactions:
-            item = SaleItem.query.filter_by(uid=transaction.item_uid).first()
-            if item:
-                sale_items.append({
-                    'name': item.name,
-                    'quantity': transaction.transaction_quantity,
-                    'price': transaction.item_price
-                })
-
-        # Generate base64 images for HTML
-        barcode_data = f"SALE-{sale_record.uid}"
-        qrcode_data = f"Sale ID: {sale_record.id}\nTotal: {sale_record.sale_total}\nDate: {sale_record.created_at}"
-
-        barcode_base64 = generate_barcode_base64(barcode_data)
-        qrcode_base64 = generate_qrcode_base64(qrcode_data)
-
-        # Shop data
-        shop_data = load_shop_data()
-
-        # Current time
-        current_time = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-
-        response = make_response(render_template(
-            'sales_receipt_template.html',
-            sale_record=sale_record,
-            sale_items=sale_items,
-            shop_data=shop_data,
-            barcode_base64=barcode_base64,
-            barcode_data=barcode_data,
-            qrcode_base64=qrcode_base64,
-            current_time=current_time
-        ))
-        return response
-    else:
-        # Original PDF download functionality
-        # Use ReportLab directly for reliable image embedding
-        from reportlab.lib.pagesizes import letter
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
-    from reportlab.lib import colors
-    from reportlab.lib.units import inch
-
-    # Fetch sale record
-    sale_record = SaleRecord.query.filter_by(id=sale_id).first()
-    if not sale_record:
-        abort(404, description="Sale record not found")
-
-    # Fetch sale items from transactions linked to this sale
-    sale_items = []
-    transactions = SaleItemTransaction.query.filter_by(sale_id=sale_id).all()
-    for transaction in transactions:
-        item = SaleItem.query.filter_by(uid=transaction.item_uid).first()
-        if item:
-            sale_items.append({
-                'name': item.name,
-                'quantity': transaction.transaction_quantity,
-                'price': transaction.item_price
-            })
-
-    # Generate images
-    barcode_data = f"SALE-{sale_record.uid}"
-    qrcode_data = f"Sale ID: {sale_record.id}\nTotal: {sale_record.sale_total}\nDate: {sale_record.created_at}"
-
-    barcode_img = generate_barcode_image(barcode_data)
-    qrcode_img = generate_qrcode_image(qrcode_data)
-
-    # Shop data
-    shop_data = load_shop_data()
-
-    # Create PDF buffer
-    pdf_buffer = BytesIO()
-
-    # Create the PDF document - receipt format: 3 inches wide, auto height
-    doc = SimpleDocTemplate(pdf_buffer, pagesize=(3*inch, 11*inch),
-                           leftMargin=0.1*inch, rightMargin=0.1*inch,
-                           topMargin=0.1*inch, bottomMargin=0.1*inch)
-    styles = getSampleStyleSheet()
-
-    # Custom styles - ensure full width
-    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=14, alignment=1, spaceAfter=10, leftIndent=0, rightIndent=0)
-    normal_style = ParagraphStyle('Normal', parent=styles['Normal'], fontSize=8, leading=10, leftIndent=0, rightIndent=0)
-    item_style = ParagraphStyle('Item', parent=styles['Normal'], fontSize=7, leading=8, fontName='Courier', leftIndent=0, rightIndent=0)
-    center_style = ParagraphStyle('Center', parent=styles['Normal'], fontSize=10, alignment=1, spaceAfter=15, leftIndent=0, rightIndent=0)
-
-    story = []
-
-    # Header - full width
-    story.append(Paragraph(shop_data['pos_shop_name'], title_style))
-    story.append(Paragraph(shop_data['shop_adress'], normal_style))
-    story.append(Paragraph(f"Tel: {shop_data['pos_shop_call_number']}", normal_style))
-    story.append(Paragraph(f"Receipt #{sale_record.uid}", center_style))
-
-    # Sale info table - full width
-    info_data = [
-        ['Date:', sale_record.created_at.strftime('%Y-%m-%d %H:%M')],
-        ['Clerk:', sale_record.sale_clerk],
-        ['Payment:', sale_record.payment_method or 'Cash']
-    ]
-
-    info_table = Table(info_data, colWidths=[1.2*inch, 1.5*inch])  # Full width columns
-    info_table.setStyle(TableStyle([
-        ('FONTSIZE', (0, 0), (-1, -1), 8),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('LEFTPADDING', (0, 0), (-1, -1), 0),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-    ]))
-    story.append(info_table)
-    story.append(Spacer(1, 10))
-
-    # Items header - full width
-    items_header_style = ParagraphStyle('ItemsHeader', parent=styles['Heading3'], fontSize=10, spaceAfter=5, leftIndent=0, rightIndent=0)
-    story.append(Paragraph("Items Purchased", items_header_style))
-
-    # Items - full width
-    for item in sale_items:
-        item_text = f"{item['name'][:18]}{'...' if len(item['name']) > 18 else ''} {item['quantity']}x ${item['price']:.2f}"
-        story.append(Paragraph(item_text, item_style))
-
-    # Separator - full width
-    story.append(Paragraph("=" * 50, item_style))  # More characters for full width
-
-    # Totals - full width
-    story.append(Paragraph(f"Total: ${sale_record.sale_total:.2f}", item_style))
-    story.append(Paragraph(f"Amount Paid: ${sale_record.sale_paid_amount:.2f}", item_style))
-    story.append(Paragraph(f"Change/Balance: ${sale_record.sale_balance:.2f}", item_style))
-
-    story.append(Spacer(1, 15))
-
-    # Images section - full width
-    if barcode_img or qrcode_img:
-        # Single row with both images side by side
-        if barcode_img and qrcode_img:
-            # Both images in one row
-            barcode_buffer = BytesIO()
-            barcode_img.save(barcode_buffer, format='PNG')
-            barcode_buffer.seek(0)
-            barcode_rl_img = RLImage(barcode_buffer)
-            barcode_rl_img.drawWidth = 1.5 * inch  # Wider barcode
-            barcode_rl_img.drawHeight = 0.4 * inch
-
-            qrcode_buffer = BytesIO()
-            qrcode_img.save(qrcode_buffer, format='PNG')
-            qrcode_buffer.seek(0)
-            qrcode_rl_img = RLImage(qrcode_buffer)
-            qrcode_rl_img.drawWidth = 0.8 * inch   # Smaller QR code
-            qrcode_rl_img.drawHeight = 0.8 * inch
-
-            # Single row table with both images
-            images_table = Table([[barcode_rl_img, qrcode_rl_img]], colWidths=[1.6*inch, 0.9*inch])
-            images_table.setStyle(TableStyle([
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('LEFTPADDING', (0, 0), (-1, -1), 0),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-            ]))
-            story.append(images_table)
-
-        elif barcode_img:
-            # Only barcode
-            barcode_buffer = BytesIO()
-            barcode_img.save(barcode_buffer, format='PNG')
-            barcode_buffer.seek(0)
-            barcode_rl_img = RLImage(barcode_buffer)
-            barcode_rl_img.drawWidth = 2.4 * inch  # Full width for single image
-            barcode_rl_img.drawHeight = 0.4 * inch
-            story.append(barcode_rl_img)
-
-        elif qrcode_img:
-            # Only QR code
-            qrcode_buffer = BytesIO()
-            qrcode_img.save(qrcode_buffer, format='PNG')
-            qrcode_buffer.seek(0)
-            qrcode_rl_img = RLImage(qrcode_buffer)
-            qrcode_rl_img.drawWidth = 1.2 * inch   # Centered QR code
-            qrcode_rl_img.drawHeight = 1.2 * inch
-            story.append(qrcode_rl_img)
-
-    # Footer - full width
-    story.append(Spacer(1, 20))
-    footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=9, alignment=1, leftIndent=0, rightIndent=0)
-    timestamp_style = ParagraphStyle('Timestamp', parent=styles['Normal'], fontSize=7, alignment=1, leftIndent=0, rightIndent=0)
-    story.append(Paragraph("Thank you for your business!", footer_style))
-    story.append(Paragraph(datetime.now().strftime("%d/%m/%Y %H:%M:%S"), timestamp_style))
-
-    # Build PDF
-    doc.build(story)
-    pdf_buffer.seek(0)
-
-    print("PDF generated successfully with ReportLab")
-
-    # Return as download
-    response = make_response(pdf_buffer.read())
-    response.headers['Content-Type'] = 'application/pdf'
-    response.headers['Content-Disposition'] = f'attachment; filename=receipt_{sale_record.uid}.pdf'
-    return response
 
 def run_heroku_mode():
     h_port = int(os.environ.get('PORT', 8080))

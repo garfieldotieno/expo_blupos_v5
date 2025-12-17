@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/home/stark/work/Work2Backup/Work/expo_blupos_v5/backend.py", line 3, in <module>
+    from flask import Flask, render_template, request, abort, redirect, make_response, url_for, session, send_file, jsonify
+ModuleNotFoundError: No module named 'flask'

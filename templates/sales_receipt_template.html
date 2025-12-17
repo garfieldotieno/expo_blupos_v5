@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Thermal Receipt</title>
+    <style>
+        /* Support for both 57mm and 80mm thermal printers */
+        @page {
+            size: auto; /* Let browser determine based on content */
+            margin: 1mm; /* Minimal margins for thermal printing */
+        }
+        @media print {
+            @page {
+                size: auto; /* Auto-size for different paper widths */
+                margin: 1mm;
+            }
+            body {
+                margin: 0 auto !important;
+                width: auto !important;
+                max-width: none !important;
+                padding: 1mm !important; /* Reduced padding for 57mm compatibility */
+                min-width: 50mm !important; /* Minimum width for 57mm */
+                max-width: 76mm !important; /* Maximum width for 80mm */
+            }
+            .header, .section, .items-section, .codes-section, .footer {
+                page-break-inside: avoid;
+            }
+            /* Scale images for smaller paper */
+            .barcode img {
+                max-width: 100% !important;
+                height: auto !important;
+            }
+            .qrcode img {
+                max-width: 15mm !important;
+                height: 15mm !important;
+            }
+        }
+        body {
+            font-family: 'Courier New', monospace;
+            font-size: 8px; /* Slightly smaller for 57mm compatibility */
+            line-height: 1.1; /* Tighter line spacing */
+            color: #000;
+            margin: 0 auto; /* Center the body */
+            padding: 1mm; /* Reduced padding for thermal printing */
+            width: auto; /* Fluid width */
+            max-width: 76mm; /* 80mm paper limit */
+            min-width: 50mm; /* 57mm paper minimum */
+            word-wrap: break-word;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 1px dashed #000;
+            padding-bottom: 3mm;
+            margin-bottom: 3mm;
+        }
+        .header img {
+            max-width: 18mm; /* Smaller for 57mm compatibility */
+            max-height: 12mm;
+            margin-bottom: 1mm;
+        }
+        .header h1 {
+            margin: 1mm 0;
+            font-size: 11px; /* Slightly smaller for narrow paper */
+            font-weight: bold;
+        }
+        .header p {
+            margin: 0.5mm 0;
+            font-size: 7px; /* Smaller font for 57mm */
+        }
+        .section {
+            margin-bottom: 3mm;
+        }
+        .section h3 {
+            font-size: 10px;
+            font-weight: bold;
+            margin: 0 0 2mm 0;
+            padding-bottom: 1mm;
+            border-bottom: 1px dashed #ccc;
+        }
+        .info-table {
+            width: 100%;
+            margin-bottom: 2mm;
+        }
+        .info-table td {
+            padding: 0.5mm 0;
+            vertical-align: top;
+            font-size: 8px;
+        }
+        .info-table .label {
+            font-weight: bold;
+            width: 40%;
+            padding-right: 2mm;
+        }
+        .info-table .value {
+            width: 60%;
+        }
+        .items-section {
+            margin: 3mm 0;
+        }
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 8px;
+        }
+        .items-table th,
+        .items-table td {
+            border: none;
+            padding: 1mm 0.5mm;
+            text-align: left;
+        }
+        .items-table th {
+            font-weight: bold;
+            font-size: 9px;
+            border-bottom: 1px dashed #000;
+        }
+        .items-table .text-right {
+            text-align: right;
+        }
+        .items-table .text-center {
+            text-align: center;
+        }
+        .codes-section {
+            text-align: center;
+            margin: 3mm 0;
+            border-top: 1px dashed #000;
+            padding-top: 2mm;
+        }
+        .barcode {
+            margin: 2mm 0;
+        }
+        .barcode img {
+            max-width: 60mm;
+            height: auto;
+        }
+        .qrcode {
+            margin: 2mm 0;
+        }
+        .qrcode img {
+            width: 20mm;
+            height: 20mm;
+        }
+        .footer {
+            margin-top: 3mm;
+            text-align: center;
+            border-top: 1px dashed #000;
+            padding-top: 2mm;
+            font-size: 7px;
+        }
+        .footer p {
+            margin: 1mm 0;
+        }
+        .divider {
+            border-top: 1px dashed #000;
+            margin: 2mm 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <img src="/static/assets/{{ shop_data['shop_banner_one'] }}" alt="Shop Logo">
+        <h1>{{ shop_data['pos_shop_name'] }}</h1>
+        <p>{{ shop_data['shop_adress'] }}</p>
+        <p>Tel: {{ shop_data['pos_shop_call_number'] }}</p>
+    </div>
+
+    <div class="section">
+        <h3>SALE RECEIPT</h3>
+        <table class="info-table">
+            <tr>
+                <td class="label">Receipt ID:</td>
+                <td class="value">{{ sale_record.uid }}</td>
+            </tr>
+            <tr>
+                <td class="label">Clerk:</td>
+                <td class="value">{{ sale_record.sale_clerk }}</td>
+            </tr>
+            <tr>
+                <td class="label">Payment:</td>
+                <td class="value">{{ sale_record.payment_method or 'Cash' }}</td>
+            </tr>
+            <tr>
+                <td class="label">Reference:</td>
+                <td class="value">{{ sale_record.payment_reference or 'N/A' }}</td>
+            </tr>
+            <tr>
+                <td class="label">Date:</td>
+                <td class="value">{{ sale_record.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="items-section">
+        <h3>ITEMS PURCHASED</h3>
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th style="width: 10%;">#</th>
+                    <th style="width: 60%;">Item</th>
+                    <th style="width: 15%;" class="text-right">Qty</th>
+                    <th style="width: 15%;" class="text-right">Price</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in sale_items %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ item.name[:15] }}{% if item.name|length > 15 %}...{% endif %}</td>
+                    <td class="text-right">{{ item.quantity }}</td>
+                    <td class="text-right">KES {{ "%.2f"|format(item.price) }}</td>
+                </tr>
+                {% endfor %}
+                <tr class="divider">
+                    <td colspan="4"></td>
+                </tr>
+                {% set vat_rate = 0.16 %}
+                {% set vat_total = sale_record.sale_total * vat_rate %}
+                {% set sub_total = sale_record.sale_total - vat_total %}
+                <tr>
+                    <td colspan="3" style="text-align: right; font-weight: bold;">SUBTOTAL:</td>
+                    <td class="text-right" style="font-weight: bold;">KES {{ "%.2f"|format(sub_total) }}</td>
+                </tr>
+                <tr>
+                    <td colspan="3" style="text-align: right; font-weight: bold;">VAT TOTAL:</td>
+                    <td class="text-right" style="font-weight: bold;">KES {{ "%.2f"|format(vat_total) }}</td>
+                </tr>
+                <tr>
+                    <td colspan="3" style="text-align: right; font-weight: bold;">TOTAL:</td>
+                    <td class="text-right" style="font-weight: bold;">KES {{ "%.2f"|format(sale_record.sale_total) }}</td>
+                </tr>
+                <tr>
+                    <td colspan="3" style="text-align: right; font-weight: bold;">PAID:</td>
+                    <td class="text-right" style="font-weight: bold;">KES {{ "%.2f"|format(sale_record.sale_paid_amount) }}</td>
+                </tr>
+                <tr>
+                    <td colspan="3" style="text-align: right; font-weight: bold;">CHANGE:</td>
+                    <td class="text-right" style="font-weight: bold;">KES {{ "%.2f"|format(sale_record.sale_balance) }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="codes-section">
+        {% if barcode_base64 %}
+        <div class="barcode">
+            <img src="{{ barcode_base64 }}" alt="Barcode">
+            <div style="text-align: center; font-size: 8px; margin-top: 2px; font-family: 'Courier New', monospace;">{{ barcode_data }}</div>
+        </div>
+        {% endif %}
+        {% if qrcode_base64 %}
+        <div class="qrcode">
+            <img src="{{ qrcode_base64 }}" alt="QR Code">
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="footer">
+        <p>*** Thank you for your business! ***</p>
+        <p>Generated: {{ current_time }}</p>
+        <p>Thermal Receipt (57mm/80mm)</p>
+    </div>
+
+    <script>
+        // Auto-print when page loads
+        window.onload = function() {
+            // Small delay to ensure images are loaded
+            setTimeout(function() {
+                window.print();
+            }, 500);
+        };
+
+        // Close window after printing (optional)
+        window.onafterprint = function() {
+            // Optionally close the window after printing
+            // window.close();
+        };
+    </script>
+</body>
+</html>
