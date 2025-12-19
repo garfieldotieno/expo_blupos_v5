@@ -124,23 +124,27 @@ function init_display(){
 
 function togglePaymentFields() {
     var paymentMethodSelect = document.getElementById("payment_method");
+    if (!paymentMethodSelect) return; // Exit if element doesn't exist on this page
+
     var selectedPaymentMethod = paymentMethodSelect.value;
-    
+
     var cashFields = document.getElementById("cash_fields");
     var mpesaFields = document.getElementById("mpesa_fields");
-    
+
     if (selectedPaymentMethod === "cash") {
-        cashFields.style.display = "block";
-        mpesaFields.style.display = "none";
+        if (cashFields) cashFields.style.display = "block";
+        if (mpesaFields) mpesaFields.style.display = "none";
     } else if (selectedPaymentMethod === "mpesa") {
-        cashFields.style.display = "none";
-        mpesaFields.style.display = "block";
+        if (cashFields) cashFields.style.display = "none";
+        if (mpesaFields) mpesaFields.style.display = "block";
     }
 }
 
 
-// Call togglePaymentFields initially to show/hide fields based on default selection
-togglePaymentFields();
+// Call togglePaymentFields initially to show/hide fields based on default selection (only if elements exist)
+if (document.getElementById("payment_method")) {
+    togglePaymentFields();
+}
 
 
 

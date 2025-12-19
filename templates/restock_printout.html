@@ -1,69 +1,316 @@
-{% extends 'side_nav_base.html' %}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Re-stock List - Thermal Receipt</title>
+    <style>
+        /* Support for both 57mm and 80mm thermal printers */
+        @page {
+            size: auto; /* Let browser determine based on content */
+            margin: 1mm; /* Minimal margins for thermal printing */
+        }
+        @media print {
+            @page {
+                size: auto; /* Auto-size for different paper widths */
+                margin: 1mm;
+            }
+            body {
+                margin: 0 auto !important;
+                width: auto !important;
+                max-width: none !important;
+                padding: 1mm !important; /* Reduced padding for 57mm compatibility */
+                min-width: 50mm !important; /* Minimum width for 57mm */
+                max-width: 76mm !important; /* Maximum width for 80mm */
+            }
+            .header, .section, .items-section, .codes-section, .footer {
+                page-break-inside: avoid;
+            }
+            /* Scale images for smaller paper */
+            .barcode img {
+                max-width: 100% !important;
+                height: auto !important;
+            }
+            .qrcode img {
+                max-width: 15mm !important;
+                height: 15mm !important;
+            }
+        }
+        body {
+            font-family: 'Courier New', monospace;
+            font-size: 8px; /* Slightly smaller for 57mm compatibility */
+            line-height: 1.1; /* Tighter line spacing */
+            color: #000;
+            margin: 0 auto; /* Center the body */
+            padding: 1mm; /* Reduced padding for thermal printing */
+            width: auto; /* Fluid width */
+            max-width: 76mm; /* 80mm paper limit */
+            min-width: 50mm; /* 57mm paper minimum */
+            word-wrap: break-word;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 1px dashed #000;
+            padding-bottom: 3mm;
+            margin-bottom: 3mm;
+        }
+        .header img {
+            max-width: 18mm; /* Smaller for 57mm compatibility */
+            max-height: 12mm;
+            margin-bottom: 1mm;
+        }
+        .header h1 {
+            margin: 1mm 0;
+            font-size: 11px; /* Slightly smaller for narrow paper */
+            font-weight: bold;
+        }
+        .header p {
+            margin: 0.5mm 0;
+            font-size: 7px; /* Smaller font for 57mm */
+        }
+        .section {
+            margin-bottom: 3mm;
+        }
+        .section h3 {
+            font-size: 10px;
+            font-weight: bold;
+            margin: 0 0 2mm 0;
+            padding-bottom: 1mm;
+            border-bottom: 1px dashed #ccc;
+        }
+        .info-table {
+            width: 100%;
+            margin-bottom: 2mm;
+        }
+        .info-table td {
+            padding: 0.5mm 0;
+            vertical-align: top;
+            font-size: 8px;
+        }
+        .info-table .label {
+            font-weight: bold;
+            width: 40%;
+            padding-right: 2mm;
+        }
+        .info-table .value {
+            width: 60%;
+        }
+        .items-section {
+            margin: 3mm 0;
+        }
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 8px;
+        }
+        .items-table th,
+        .items-table td {
+            border: none;
+            padding: 1mm 0.5mm;
+            text-align: left;
+        }
+        .items-table th {
+            font-weight: bold;
+            font-size: 9px;
+            border-bottom: 1px dashed #000;
+        }
+        .items-table .text-right {
+            text-align: right;
+        }
+        .items-table .text-center {
+            text-align: center;
+        }
+        .codes-section {
+            text-align: center;
+            margin: 3mm 0;
+            border-top: 1px dashed #000;
+            padding-top: 2mm;
+        }
+        .barcode {
+            margin: 2mm 0;
+        }
+        .barcode img {
+            max-width: 60mm;
+            height: auto;
+        }
+        .qrcode {
+            margin: 2mm 0;
+        }
+        .qrcode img {
+            width: 20mm;
+            height: 20mm;
+        }
+        .footer {
+            margin-top: 3mm;
+            text-align: center;
+            border-top: 1px dashed #000;
+            padding-top: 2mm;
+            font-size: 7px;
+        }
+        .footer p {
+            margin: 1mm 0;
+        }
+        .divider {
+            border-top: 1px dashed #000;
+            margin: 2mm 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <img src="/static/assets/{{ shop_data[0]['shop_banner_one'] }}" alt="Shop Logo">
+        <h1>{{ shop_data[0]['pos_shop_name'] }}</h1>
+        <p>{{ shop_data[0]['shop_adress'] }}</p>
+        <p>Tel: {{ shop_data[0]['pos_shop_call_number'] }}</p>
+        <p><strong>Generated by: {{ user_name['user_name'] }}</strong></p>
+    </div>
 
-{% block content %}
-<div class="container">
-        <div class="print_container">
-            <div class="restock_printout_container">
-                <div class="print-receipt" id="print_template">
-                    <div class="receipt-header">
-                        <h2 style="text-align: center;">Restock Printout</h2>
+    <div class="section">
+        <h3>RE-STOCK LIST</h3>
+        <table class="info-table">
+            <tr>
+                <td class="label">Items to Restock:</td>
+                <td class="value">{{ items|length }}</td>
+            </tr>
+            <tr>
+                <td class="label">Date:</td>
+                <td class="value">{{ current_time }}</td>
+            </tr>
+        </table>
+    </div>
 
-                        <div style="text-align: center;">
-                            <img src="static/assets/{{shop_data[0]['shop_banner_one']}}" alt="" style="max-width: 4rem; height: auto; display: inline-block;">
-                            <p class="text-center">{{shop_data[0]['pos_shop_name']}}</p>
-                            <p class="text-center">{{shop_data[0]['pos_shop_call_number']}}</p>
-                            <p class="text-center">{{shop_data[0]['pos_shop_email']}}</p>
-                            <p class="text-center">{{shop_data[0]['shop_adress']}}</p>
-                            <p class="text-center">============================</p>
-                        </div>
-                        <br>
-                        <br>
-                        
-                    </div>
-                    
-                    <div class="receipt-list">
-                        
-                            {% for item in items %}
-                        <div class="receipt-item">
-                            <div style="text-align: center;">
-                                <span class="item-name">Item Name: {{ item.name }}</span><br>
-                            <span class="item-id">Item ID: {{ item.id }}</span><br>
-                            
-                            <span class="item-stock">Last Stock Count: {{ item.last_stock_count }}</span><br>
-                            <span class="item-price">Price: ${{ item.price }}</span><br>
-                            <span class="">--------------------------------------</span>
-                            </div>
-                            
-                        </div>
-                        {% endfor %}
-                        
-                        
-                    </div>
-                    <div class="receipt-footer">
-                        <!-- generate time in javascript -->
-                        <p class="text-center">============================</p>
-                        <p class="text-center">Generated at: {{ current_time }}</p>
-                    </div>
-                </div>
-                <button class="dark_btn" onclick="print_sale_receipt()">
-                    Print
-                </button>
-                <button class="dark_btn" onclick="window.location.href = '/';">
-                    Cancel
-                </button>
-                
-            </div>
-            
+    <div class="items-section">
+        <h3>ITEMS NEEDING RESTOCK</h3>
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th style="width: 10%;">#</th>
+                    <th style="width: 55%;">Item</th>
+                    <th style="width: 17%;" class="text-center">Current</th>
+                    <th style="width: 18%;" class="text-center">Min Level</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ item.name[:15] }}{% if item.name|length > 15 %}...{% endif %}</td>
+                    <td class="text-center">{{ item.current_stock_count }}</td>
+                    <td class="text-center">{{ item.re_stock_value }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="codes-section">
+        {% if barcode_data %}
+        <div class="barcode">
+            <img src="{{ barcode_base64 }}" alt="Barcode">
+            <div style="text-align: center; font-size: 8px; margin-top: 2px; font-family: 'Courier New', monospace;">{{ barcode_data }}</div>
         </div>
-        
-    
-</div>
-<script src="../static/node_modules/print-js/dist/print.js"></script>
+        {% endif %}
+        {% if qrcode_data %}
+        <div class="qrcode">
+            <img src="{{ qrcode_data }}" alt="QR Code">
+        </div>
+        {% endif %}
+    </div>
 
-<script src="../static/js/main.js"></script>
-<script>
-    function print_sale_receipt(){
-        printJS('print_template', 'html')
-    }
-</script>
-{% endblock content %}
+    <div class="footer">
+        <p>*** Please restock these items! ***</p>
+        <p>Generated: {{ current_time }}</p>
+        <p>Thermal Receipt (57mm/80mm)</p>
+    </div>
+
+    <!-- Include barcode and QR code libraries -->
+    <script src="/static/js/JsBarcode.all.min.js"></script>
+    <script src="/static/js/qrcode_dev/qrcode.min.js"></script>
+
+    <script>
+        // Function to generate and display a barcode based on the provided number
+        function generateBarcode(randomNumber) {
+            // Generate barcode using JsBarcode library
+            JsBarcode("#barcode_area", randomNumber.toString(), {
+                format: "CODE128",
+                displayValue: true,
+                fontSize: 12,
+                margin: 0,
+                width: 1,
+                height: 30
+            });
+        }
+
+        // Function to generate and display a QR code based on the provided content
+        function generateQRCode(content) {
+            try {
+                console.log('Generating QR code for:', content);
+
+                // Check if QRCode library is available
+                if (typeof QRCode === 'undefined') {
+                    console.error('QRCode library not loaded');
+                    // Fallback: create a simple placeholder
+                    const qrContainer = document.getElementById("qrcode_area");
+                    qrContainer.innerHTML = '<div style="width: 80px; height: 80px; border: 1px solid #000; display: inline-block; text-align: center; line-height: 80px; font-size: 10px;">QR</div>';
+                    return;
+                }
+
+                // Clear any existing content
+                const qrContainer = document.getElementById("qrcode_area");
+                qrContainer.innerHTML = '';
+
+                // Create a new QRCode instance
+                var qrCode = new QRCode(qrContainer, {
+                    text: content,
+                    width: 80,
+                    height: 80,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.H
+                });
+                console.log('QR code generated successfully');
+            } catch (error) {
+                console.error('Error generating QR code:', error);
+                // Fallback: create a simple placeholder
+                const qrContainer = document.getElementById("qrcode_area");
+                qrContainer.innerHTML = '<div style="width: 80px; height: 80px; border: 1px solid #000; display: inline-block; text-align: center; line-height: 80px; font-size: 10px;">QR</div>';
+            }
+        }
+
+        // Generate barcode and QR code for restock list
+        document.addEventListener('DOMContentLoaded', function() {
+            // Generate transaction code for restock list
+            const restockCode = 'RESTOCK-' + Date.now().toString().slice(-8);
+
+            // Generate barcode
+            generateBarcode(restockCode);
+
+            // Update barcode text
+            document.getElementById('barcode_text').textContent = restockCode;
+
+            // Generate QR code with restock info
+            const qrData = `Restock List\nItems: {{ items|length }}\nCode: ${restockCode}\nGenerated: ${new Date().toLocaleString()}`;
+            generateQRCode(qrData);
+
+            // Add transaction code display in footer
+            const tranxCodeElement = document.querySelector('.footer p:first-child');
+            if (tranxCodeElement) {
+                tranxCodeElement.insertAdjacentHTML('afterend', `<p>Code: ${restockCode}</p>`);
+            }
+        });
+
+        // Auto-print when page loads
+        window.onload = function() {
+            // Small delay to ensure content is loaded
+            setTimeout(function() {
+                window.print();
+            }, 1000); // Increased delay for barcode/QR generation
+        };
+
+        // Close window after printing (optional)
+        window.onafterprint = function() {
+            // Optionally close the window after printing
+            // window.close();
+        };
+    </script>
+</body>
+</html>

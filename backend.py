@@ -61,7 +61,7 @@ session_middleware = {
     "Anonymous": {"allowed_routes": ['/', '/about', '/invalid']},
     "Admin" : {"allowed_routes":['/users', '/records', '/add_user', '/delete_user']},
     "Sale":{"allowed_routes":['/sales', '/add_sale_record']},
-    "Inventory" : {"allowed_routes":['/inventory', '/add_item_inventory', '/edit_item', '/delete_item_inventory', '/delete_item_inventory', '/item/', '/update_item_inventory', '/get_restock_printout', '/get_sale_record_printout', '/get_sale_transaction_printout']}
+    "Inventory" : {"allowed_routes":['/inventory', '/add_item_inventory', '/edit_item', '/delete_item_inventory', '/delete_item_inventory', '/item/', '/update_item_inventory', '/get_restock_printout', '/get_sale_record_printout', '/get_sale_transaction_printout', '/api/inventory/items', '/api/inventory/transactions', '/api/inventory/sales']}
 }
 
 def is_active():
@@ -410,6 +410,51 @@ def get_all_sale_item_stock_count():
     return SaleItemStockCount.query.all()
 
 
+# Pagination functions
+def get_paginated_items(page, limit):
+    offset = (page - 1) * limit
+    total_items = SaleItem.query.count()
+    total_pages = (total_items + limit - 1) // limit  # Ceiling division
+
+    # Get paginated items with stock info
+    items = SaleItem.query.offset(offset).limit(limit).all()
+
+    # Add stock information to items
+    stock_count = SaleItemStockCount.query.all()
+    for item in items:
+        for stock in stock_count:
+            if item.uid == stock.item_uid:
+                item.last_stock_count = stock.last_stock_count
+                item.current_stock_count = stock.current_stock_count
+                item.re_stock_value = stock.re_stock_value
+                item.re_stock_status = stock.re_stock_status
+                break
+
+    return {"items": items, "total_pages": total_pages, "current_page": page, "total_items": total_items}
+
+def get_paginated_item_transactions(page, limit):
+    offset = (page - 1) * limit
+    total_transactions = SaleItemTransaction.query.count()
+    total_pages = (total_transactions + limit - 1) // limit
+
+    transactions = SaleItemTransaction.query.offset(offset).limit(limit).all()
+
+    # Add item names to transactions
+    for transaction in transactions:
+        item = SaleItem.query.filter_by(uid=transaction.item_uid).first()
+        transaction.item_name = item.name if item else 'N/A'
+
+    return {"transactions": transactions, "total_pages": total_pages, "current_page": page, "total_items": total_transactions}
+
+def get_paginated_sale_records(page, limit):
+    offset = (page - 1) * limit
+    total_records = SaleRecord.query.count()
+    total_pages = (total_records + limit - 1) // limit
+
+    records = SaleRecord.query.offset(offset).limit(limit).all()
+
+    return {"records": records, "total_pages": total_pages, "current_page": page, "total_items": total_records}
+
 class InventoryOperations():
     @staticmethod
     def add_item_inventory(payload):
@@ -421,7 +466,7 @@ class InventoryOperations():
         else:
             return {"status":False}
 
-        
+
 
     @staticmethod
     def get_item_inventory(payload):
@@ -434,7 +479,7 @@ class InventoryOperations():
         item.re_stock_status = stock_count.re_stock_status
         return item
 
-        
+
     @staticmethod
     def get_all_items_inventory():
         # get all data that containes saleitem and its inventory count
@@ -451,7 +496,7 @@ class InventoryOperations():
                 print(item)
         return items
 
-        
+
     @staticmethod
     def update_item_inventory(payload):
         # update item record in SaleItem and SaleItemStockCount
@@ -508,7 +553,7 @@ def inventory_home():
         flash_payload = ""
 
     if query['status'] and request.path in query['middleware']['allowed_routes']:
-        print(f"get all items : {get_all_items()}")
+        print(f"get paginated items : {get_paginated_items(1, 20)}")
         response = make_response(render_template(
             'inventory_management.html',
             is_active = True,
@@ -518,17 +563,92 @@ def inventory_home():
             user_type=session['session_user'].decode('utf-8'),
             user_name=user_from_session(),
             shop_data = [load_shop_data()],
-            items = InventoryOperations.get_all_items_inventory(),
+            items = get_paginated_items(1, 20)['items'],
+            items_total_pages = get_paginated_items(1, 20)['total_pages'],
+            items_current_page = 1,
 
-            item_transactions = SaleItemTransaction.query.all(),
+            item_transactions = get_paginated_item_transactions(1, 20)['transactions'],
+            transactions_total_pages = get_paginated_item_transactions(1, 20)['total_pages'],
+            transactions_current_page = 1,
 
-            sale_records = SaleRecord.query.all(),
+            sale_records = get_paginated_sale_records(1, 20)['records'],
+            sale_records_total_pages = get_paginated_sale_records(1, 20)['total_pages'],
+            sale_records_current_page = 1,
 
             SaleItem = SaleItem
         ))
         return response
     else:
         return redirect(query['middleware']['allowed_routes'][0])
+
+@app.route('/api/inventory/items/<int:page>')
+def get_inventory_items_page(page):
+    query = is_active()
+    if query['status'] and '/inventory' in query['middleware']['allowed_routes']:
+        result = get_paginated_items(page, 20)
+        return jsonify({
+            'items': [{
+                'id': item.id,
+                'uid': item.uid,
+                'item_type': item.item_type,
+                'name': item.name,
+                'description': item.description,
+                'price': item.price,
+                'last_stock_count': item.last_stock_count,
+                'current_stock_count': item.current_stock_count,
+                're_stock_value': item.re_stock_value,
+                're_stock_status': item.re_stock_status
+            } for item in result['items']],
+            'total_pages': result['total_pages'],
+            'current_page': result['current_page'],
+            'total_items': result['total_items']
+        })
+    return jsonify({'error': 'Unauthorized'}), 403
+
+@app.route('/api/inventory/transactions/<int:page>')
+def get_inventory_transactions_page(page):
+    query = is_active()
+    if query['status'] and '/inventory' in query['middleware']['allowed_routes']:
+        result = get_paginated_item_transactions(page, 20)
+        return jsonify({
+            'transactions': [{
+                'id': transaction.id,
+                'item_uid': transaction.item_uid,
+                'item_name': getattr(transaction, 'item_name', 'N/A'),
+                'transaction_type': transaction.transaction_type,
+                'transaction_quantity': transaction.transaction_quantity,
+                'item_price': transaction.item_price,
+                'created_at': transaction.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            } for transaction in result['transactions']],
+            'total_pages': result['total_pages'],
+            'current_page': result['current_page'],
+            'total_items': result['total_items']
+        })
+    return jsonify({'error': 'Unauthorized'}), 403
+
+@app.route('/api/inventory/sales/<int:page>')
+def get_inventory_sales_page(page):
+    query = is_active()
+    if query['status'] and '/inventory' in query['middleware']['allowed_routes']:
+        result = get_paginated_sale_records(page, 20)
+        return jsonify({
+            'records': [{
+                'id': record.id,
+                'uid': record.uid,
+                'sale_clerk': record.sale_clerk,
+                'sale_total': record.sale_total,
+                'sale_paid_amount': record.sale_paid_amount,
+                'sale_balance': record.sale_balance,
+                'payment_method': record.payment_method,
+                'payment_reference': record.payment_reference,
+                'payment_gateway': record.payment_gateway,
+                'created_at': record.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            } for record in result['records']],
+            'total_pages': result['total_pages'],
+            'current_page': result['current_page'],
+            'total_items': result['total_items']
+        })
+    return jsonify({'error': 'Unauthorized'}), 403
 
 @app.route('/add_item_inventory', methods=['POST'])
 def add_item():
@@ -612,53 +732,271 @@ def delete_item():
 
 @app.route('/get_restock_printout', methods=['GET'])
 def get_restock_printout():
-    # fetches items using the class static method generate_restock_list
-    # then filters for items by evaluating if current_stock_count is less than re_stock_value
-    # returns a list of items that meet the condition
-    query = is_active()
-    print(f"query string at /user, {query}")
-    if query['status'] and request.path in query['middleware']['allowed_routes']:
-        print(f"get all items : {get_all_items()}")
-        response = make_response(render_template(
-            'restock_printout.html',
-            is_active = True,
-            title="Inventory",
-            flash_message = False,
-            flash_payload = "",
-            user_type=session['session_user'].decode('utf-8'),
-            user_name=user_from_session(),
-            shop_data = [load_shop_data()],
-            items = InventoryOperations.generate_restock_list(),
+    # Check if request wants HTML for printing (from print dialog)
+    if request.args.get('format') == 'print':
+        # Return HTML for browser printing
+        query = is_active()
+        if query['status'] and '/get_restock_printout' in query['middleware']['allowed_routes']:
+            items = InventoryOperations.generate_restock_list()
+            shop_data = load_shop_data()
+            user_name = user_from_session()
             current_time = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        ))
-        return response
+
+            response = make_response(render_template(
+                'restock_printout.html',
+                is_active=True,
+                title="Re-stock Printout",
+                flash_message=False,
+                flash_payload="",
+                user_type=session['session_user'].decode('utf-8'),
+                user_name=user_name,
+                shop_data=[shop_data],
+                items=items,
+                current_time=current_time
+            ))
+            return response
     else:
-        return redirect(query['middleware']['allowed_routes'][0])
+        # Return HTML template for detached window printing (like sales receipt)
+        query = is_active()
+        if query['status'] and '/get_restock_printout' in query['middleware']['allowed_routes']:
+            items = InventoryOperations.generate_restock_list()
+            shop_data = load_shop_data()
+            user_name = user_from_session()
+            current_time = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+            # Generate barcode and QR code data URLs (like sales receipt)
+            import qrcode
+            import base64
+            from io import BytesIO
+
+            # Generate transaction code
+            restock_code = f'RESTOCK-{datetime.now().strftime("%H%M%S")}'
+
+            # Generate barcode (simple text representation for now)
+            barcode_data = restock_code
+
+            # Generate QR code
+            qr = qrcode.QRCode(version=1, box_size=10, border=4)
+            qr_data = f"Restock List\nItems: {len(items)}\nCode: {restock_code}\nGenerated: {current_time}"
+            qr.add_data(qr_data)
+            qr.make(fit=True)
+
+            # Create QR code image
+            qr_img = qr.make_image(fill_color="black", back_color="white")
+            qr_buffer = BytesIO()
+            qr_img.save(qr_buffer, format='PNG')
+            qr_buffer.seek(0)
+            qr_base64 = base64.b64encode(qr_buffer.read()).decode('utf-8')
+            qrcode_base64 = f"data:image/png;base64,{qr_base64}"
+
+            # For barcode, create a simple data URL (could be improved)
+            barcode_base64 = f"data:text/plain;base64,{base64.b64encode(restock_code.encode()).decode()}"
+
+            response = make_response(render_template(
+                'restock_printout.html',
+                is_active=True,
+                title="Re-stock Printout",
+                flash_message=False,
+                flash_payload="",
+                user_type=session['session_user'].decode('utf-8'),
+                user_name=user_name,
+                shop_data=[shop_data],
+                items=items,
+                current_time=current_time,
+                barcode_data=barcode_data,
+                qrcode_data=qrcode_base64,
+                barcode_base64=barcode_base64
+            ))
+            return response
 
 @app.route('/get_sale_record_printout', methods=['GET'])
 def get_sale_record_printout():
-    # fetches items using the class static method generate_restock_list
-    # then filters for items by evaluating if current_stock_count is less than re_stock_value
-    # returns a list of items that meet the condition
+    # Generate PDF directly in landscape A4 format with fiscal summary
     query = is_active()
-    print(f"query string at /user, {query}")
-    if query['status'] and request.path in query['middleware']['allowed_routes']:
-        print(f"get all items : {get_all_items()}")
-        response = make_response(render_template(
-            'sales_records_printout.html',
-            is_active = True,
-            title="Inventory",
-            flash_message = False,
-            flash_payload = "",
-            user_type=session['session_user'].decode('utf-8'),
-            user_name=user_from_session(),
-            shop_data = [load_shop_data()],
-            sale_records = SaleRecord.query.all(),
-            current_time = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        ))
-        return response
-    else:
+    if not (query['status'] and '/get_sale_record_printout' in query['middleware']['allowed_routes']):
         return redirect(query['middleware']['allowed_routes'][0])
+
+    # Get date parameters
+    start_date_str = request.args.get('start_date')
+    end_date_str = request.args.get('end_date')
+
+    # Parse dates if provided
+    start_date = None
+    end_date = None
+    if start_date_str and end_date_str:
+        try:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
+            # Set end_date to end of day
+            end_date = end_date.replace(hour=23, minute=59, second=59)
+        except ValueError:
+            # Invalid date format, ignore filtering
+            start_date = None
+            end_date = None
+
+    # Get sales records with optional date filtering
+    if start_date and end_date:
+        sale_records = SaleRecord.query.filter(
+            SaleRecord.created_at >= start_date,
+            SaleRecord.created_at <= end_date
+        ).all()
+    else:
+        sale_records = SaleRecord.query.all()
+
+    shop_data = load_shop_data()
+    user_name = user_from_session()
+
+    # Create PDF buffer for landscape A4
+    pdf_buffer = BytesIO()
+
+    # Landscape A4 format
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+    from reportlab.lib import colors
+    from reportlab.lib.units import inch
+
+    doc = SimpleDocTemplate(pdf_buffer, pagesize=landscape(A4),
+                           leftMargin=0.5*inch, rightMargin=0.5*inch,
+                           topMargin=0.5*inch, bottomMargin=0.5*inch)
+    styles = getSampleStyleSheet()
+
+    # Custom styles for fiscal report
+    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=16, alignment=1, spaceAfter=20)
+    subtitle_style = ParagraphStyle('Subtitle', parent=styles['Heading2'], fontSize=14, alignment=1, spaceAfter=15)
+    normal_style = ParagraphStyle('Normal', parent=styles['Normal'], fontSize=10, leading=12)
+    center_style = ParagraphStyle('Center', parent=styles['Normal'], fontSize=10, alignment=1, spaceAfter=10)
+
+    story = []
+
+    # Header
+    story.append(Paragraph(shop_data['pos_shop_name'], title_style))
+    story.append(Paragraph(f"Address: {shop_data['shop_adress']} | Tel: {shop_data['pos_shop_call_number']}", center_style))
+    story.append(Paragraph("SALES RECORDS REPORT", subtitle_style))
+    story.append(Paragraph(f"Generated by: {user_name['user_name']} | Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", center_style))
+    story.append(Spacer(1, 20))
+
+    # Fiscal Summary Section
+    if sale_records:
+        # Calculate fiscal summary
+        total_sales = sum(record.sale_total for record in sale_records)
+        total_paid = sum(record.sale_paid_amount for record in sale_records)
+        total_balance = sum(record.sale_balance for record in sale_records)
+        total_transactions = len(sale_records)
+
+        # Payment method breakdown
+        payment_methods = {}
+        for record in sale_records:
+            method = record.payment_method or 'Cash'
+            if method not in payment_methods:
+                payment_methods[method] = {'count': 0, 'amount': 0}
+            payment_methods[method]['count'] += 1
+            payment_methods[method]['amount'] += record.sale_total
+
+        story.append(Paragraph("FISCAL SUMMARY", subtitle_style))
+
+        # Format numbers with commas and decimals
+        def format_currency(amount):
+            return f"KES {amount:,.2f}"
+
+        # Summary table
+        summary_data = [
+            ['Total Transactions', 'Total Sales Amount', 'Total Amount Paid', 'Total Balance/Change'],
+            [str(total_transactions), format_currency(total_sales), format_currency(total_paid), format_currency(total_balance)]
+        ]
+
+        summary_table = Table(summary_data, colWidths=[2*inch, 2*inch, 2*inch, 2*inch])
+        summary_table.setStyle(TableStyle([
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('FONTNAME', (0, 0), (-1, 0), 'Courier-Bold'),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('LEFTPADDING', (0, 0), (-1, -1), 5),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ]))
+        story.append(summary_table)
+        story.append(Spacer(1, 15))
+
+        # Payment methods breakdown
+        if payment_methods:
+            story.append(Paragraph("PAYMENT METHODS BREAKDOWN", styles['Heading3']))
+            payment_data = [['Payment Method', 'Transaction Count', 'Total Amount']]
+            for method, data in payment_methods.items():
+                payment_data.append([method, str(data['count']), format_currency(data['amount'])])
+
+            payment_table = Table(payment_data, colWidths=[2.5*inch, 2*inch, 2*inch])
+            payment_table.setStyle(TableStyle([
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('FONTNAME', (0, 0), (-1, 0), 'Courier-Bold'),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('LEFTPADDING', (0, 0), (-1, -1), 3),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 3),
+                ('TOPPADDING', (0, 0), (-1, -1), 3),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ]))
+            story.append(payment_table)
+            story.append(Spacer(1, 20))
+
+        # Page break before detailed records
+        story.append(PageBreak())
+
+        # Detailed Sales Records
+        story.append(Paragraph("DETAILED SALES RECORDS", subtitle_style))
+
+        # Records table header
+        records_data = [['Transaction ID', 'Clerk', 'Total', 'Paid', 'Change/Balance', 'Payment Method', 'Date/Time']]
+
+        # Add records (limit to avoid huge PDF)
+        for record in sale_records[:500]:  # Limit to 500 records to keep PDF manageable
+            records_data.append([
+                record.uid,
+                record.sale_clerk,
+                format_currency(record.sale_total),
+                format_currency(record.sale_paid_amount),
+                format_currency(record.sale_balance),
+                record.payment_method or 'Cash',
+                record.created_at.strftime('%Y-%m-%d %H:%M')
+            ])
+
+        # Create table with multiple rows per page
+        records_table = Table(records_data, colWidths=[1.2*inch, 1.5*inch, 1*inch, 1*inch, 1.2*inch, 1.5*inch, 1.5*inch])
+        records_table.setStyle(TableStyle([
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('FONTNAME', (0, 0), (-1, 0), 'Courier-Bold'),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ('LEFTPADDING', (0, 0), (-1, -1), 2),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 2),
+            ('TOPPADDING', (0, 0), (-1, -1), 2),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+        ]))
+        story.append(records_table)
+
+        if len(sale_records) > 500:
+            story.append(Spacer(1, 10))
+            story.append(Paragraph(f"* Showing first 500 of {len(sale_records)} total transactions", center_style))
+
+    else:
+        story.append(Paragraph("No sales records found", center_style))
+
+    # Build PDF
+    doc.build(story)
+    pdf_buffer.seek(0)
+
+    print("Sales records PDF generated successfully")
+
+    # Return as download that opens in print dialog
+    response = make_response(pdf_buffer.read())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = 'inline; filename=sales_records_report.pdf'
+    return response
     
 
 class SaleItemTransaction(db.Model):
