@@ -1,2 +1,0 @@
-[console_scripts]
-expo_blupos_v5 = backend:run_heroku_mode
