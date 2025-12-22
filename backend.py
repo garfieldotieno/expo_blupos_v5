@@ -78,8 +78,20 @@ def reset_session():
     return {"status":True, "middleware":session_middleware['Anonymous']}         
 
 
+class Device(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    device_id = db.Column(db.String(20), unique=True, nullable=False)
+    device_name = db.Column(db.String(50), nullable=True)
+    device_type = db.Column(db.String(20), default='web')  # 'web', 'mobile', etc.
+    created_at = db.Column(db.DateTime, default=datetime.now())
+    last_seen = db.Column(db.DateTime, default=datetime.now())
+
+    def __repr__(self):
+        return f"Device(id={self.id}, device_id='{self.device_id}', device_name='{self.device_name}', device_type='{self.device_type}', created_at={self.created_at}, last_seen={self.last_seen})"
+
 class License(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    device_id = db.Column(db.String(20), db.ForeignKey('device.device_id'), nullable=False)
     uid = db.Column(db.String(10), unique=True, nullable=False)
     license_key = db.Column(db.String(20), unique=True, nullable=False)
     license_type = db.Column(db.String(10), nullable=False)
@@ -89,9 +101,36 @@ class License(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.now())
 
     def __repr__(self):
-        return f"License(id={self.id}, uid='{self.uid}', license_key='{self.license_key}', license_type='{self.license_type}', license_status='{self.license_status}', license_expiry='{self.license_expiry}', created_at={self.created_at}, updated_at={self.updated_at})"
+        return f"License(id={self.id}, device_id='{self.device_id}', uid='{self.uid}', license_key='{self.license_key}', license_type='{self.license_type}', license_status='{self.license_status}', license_expiry='{self.license_expiry}', created_at={self.created_at}, updated_at={self.updated_at})"
 
-def create_license(payload):
+# Create all database tables on app startup
+with app.app_context():
+    db.create_all()
+    print("🔧 Database tables created/verified")
+
+    # ENFORCE SINGLE DEVICE RULE - Clean up any existing multiple devices
+    device_count = Device.query.count()
+    if device_count > 1:
+        print(f"🚨 Found {device_count} devices, enforcing single device rule...")
+
+        # Keep the most recently created device, delete others
+        all_devices = Device.query.order_by(Device.created_at.desc()).all()
+        devices_to_keep = [all_devices[0]]  # Keep the most recent
+        devices_to_delete = all_devices[1:]  # Delete the rest
+
+        for device in devices_to_delete:
+            print(f"🗑️ Removing duplicate device: {device.device_id}")
+            db.session.delete(device)
+
+        db.session.commit()
+        print("✅ Single device enforcement completed")
+    elif device_count == 1:
+        print("✅ Single device rule verified")
+    else:
+        print("ℹ️ No devices found - first-time setup ready")
+
+def create_license(payload, device_id):
+    """Create ONE license total - remove existing licenses before creating new one"""
     # Input validation
     required_fields = ['license_key', 'license_type', 'license_status', 'license_expiry']
     for field in required_fields:
@@ -99,15 +138,31 @@ def create_license(payload):
             return {"status": False, "error": f"Missing required field: {field}"}
 
     # Validate license type
-    if payload['license_type'] not in ['Full', 'Half']:
-        return {"status": False, "error": "Invalid license type. Must be 'Full' or 'Half'"}
+    if payload['license_type'] not in ['BLUPOS2025', 'DEMO2025']:
+        return {"status": False, "error": "Invalid license type. Must be 'BLUPOS2025' or 'DEMO2025'"}
 
     # Validate license key format (should be string)
     if not isinstance(payload['license_key'], str) or len(payload['license_key']) == 0:
         return {"status": False, "error": "Invalid license key"}
 
-    # update so that there can only be one record
+    # Check if device exists
+    device = Device.query.filter_by(device_id=device_id).first()
+    if not device:
+        return {"status": False, "error": "Device not found"}
+
+    print(f"🔄 Creating license: Removing any existing licenses...")
+
+    # REMOVE ALL EXISTING LICENSES to ensure only ONE license exists total
+    existing_licenses = License.query.all()
+    if existing_licenses:
+        print(f"🗑️ Removing {len(existing_licenses)} existing license(s)")
+        for license in existing_licenses:
+            db.session.delete(license)
+        db.session.commit()
+
+    # Create the SINGLE license
     license = License()
+    license.device_id = device_id
     license.uid = randomString(16)
     license.license_key = payload['license_key']
     license.license_type = payload['license_type']
@@ -115,16 +170,10 @@ def create_license(payload):
     license.license_expiry = payload['license_expiry']
 
     try:
-        # check length of records, if empty add, if one, delete and create new
-        if License.query.all() == []:
-            db.session.add(license)
-            db.session.commit()
-            return {"status": True}
-        else:
-            delete_license(1)
-            db.session.add(license)
-            db.session.commit()
-            return {"status": True}
+        db.session.add(license)
+        db.session.commit()
+        print(f"📋 Single license created for device {device_id}: {payload['license_type']} (Total licenses: 1)")
+        return {"status": True}
     except Exception as e:
         db.session.rollback()
         return {"status": False, "error": f"Database error: {str(e)}"}
@@ -143,14 +192,16 @@ def delete_license(license_id):
     return db.session.commit()
 
 def update_license(payload):
-    license = License.query.filter_by(license_key=payload['license_key']).first()
-    for key in payload:
-        if key != 'license_key':
-            setattr(license, key, payload[key])
-    license.updated_at = datetime.now()
-    db.session.add(license)
-    db.session.commit()
-    return license
+    # REMOVE existing license and create new one to ensure single license rule
+    existing_license = License.query.filter_by(license_key=payload['license_key']).first()
+    if existing_license:
+        db.session.delete(existing_license)
+        db.session.commit()
+        print(f"🗑️ Removed existing license for update")
+
+    # Create new license with updated data
+    result = create_license(payload, payload.get('device_id'))
+    return result
 
 # reset_license function here takes the 16digit value and checks against hashed equivakent in the .pos_key.yml file
 # if the hashed value is found, it is deleted and the license is reset be cr4eating new entry in the database
@@ -1293,78 +1344,50 @@ def user_home():
         flash_message = True
         flash_payload = session['session_flash_message'].decode('utf-8')
         session.pop('session_flash_message')
-     
+
     else:
         flash_message = False
         flash_payload = ""
-    
-    licenses = fetch_licenses()
-    print(f"type of fetched records is {type(licenses)} and value is {licenses}")
 
-          
+    # Check device activation state for UI display
+    device_state = "first_time"  # Default state
+    try:
+        # Check device state via the activation endpoint
+        import requests
+        response = requests.post('http://localhost:8080/activate',
+                               json={'action': 'check_expiry'},
+                               timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            device_state = data.get('app_state', 'first_time')
+            print(f"Device state from backend: {device_state}")
+        else:
+            print(f"Failed to get device state: {response.status_code}")
+    except Exception as e:
+        print(f"Error checking device state: {e}")
+
+    # Show user management interfaces when device is active or expired (not first_time)
+    show_user_interfaces = device_state in ['active', 'expired']
 
     if query['status'] and request.path in query['middleware']['allowed_routes']:
-        # check if record is active
-        if licenses == []:
-            print("no license fetched")
-            response = make_response(render_template(
-                    'user_management.html',
-                    is_active = True,
-                    title="Users",
-                    flash_message = flash_message,
-                    flash_payload = flash_payload,
-                    sector_a = False,
-                    sector_c = True,
-                    license_record = None,
-                    days_remaining = 0,
-                    user_type=session['session_user'].decode('utf-8'),
-                    user_name=user_from_session(),
-                    shop_data = [load_shop_data()],
-                    users = fetch_users()
-                ))
+        response = make_response(render_template(
+            'user_management.html',
+            is_active = True,
+            title="Master",  # Navigation bar title
+            flash_message = flash_message,
+            flash_payload = flash_payload,
+            # Show user interfaces when device is active/expired
+            sector_a = show_user_interfaces,  # User creation and listing
+            sector_c = False,  # Keep license management hidden
+            license_record = None,
+            days_remaining = 0,
+            user_type=session['session_user'].decode('utf-8'),
+            user_name=user_from_session(),
+            shop_data = [load_shop_data()],
+            users = fetch_users()  # Always fetch users for dynamic display
+        ))
+        return response
 
-            return response
-
-        else:
-            license = licenses[0]
-            if license.license_status:
-                response = make_response(render_template(
-                    'user_management.html',
-                    is_active = True,
-                    title="Users",
-                    flash_message = flash_message,
-                    flash_payload = flash_payload,
-                    sector_a = True,
-                    sector_c = True,
-                    license_record = license,
-                    days_remaining = (license.license_expiry.replace(tzinfo=timezone.utc) - datetime.now(timezone.utc)).days,
-                    user_type=session['session_user'].decode('utf-8'),
-                    user_name=user_from_session(),
-                    shop_data = [load_shop_data()],
-                    users = fetch_users()
-                ))
-                return response
-            else:
-                response = make_response(render_template(
-                    'user_management.html',
-                    is_active = True,
-                    title="Users",
-                    flash_message = flash_message,
-                    flash_payload = flash_payload,
-                    sector_a = False,
-                    sector_c = True,
-                    license_record = license,
-                    days_remaining = (license.license_expiry.replace(tzinfo=timezone.utc) - datetime.now(timezone.utc)).days,
-                    user_type=session['session_user'].decode('utf-8'),
-                    user_name=user_from_session(),
-                    shop_data = [load_shop_data()],
-                    users = fetch_users()
-                ))
-
-                return response
-                print(f"license fetched is, {license}")
-
-  
     else:
         return redirect(query['middleware']['allowed_routes'][0])
 
@@ -1466,7 +1489,9 @@ def init_app_users():
         return resp
 
 def init_app_db():
+    # Create all tables including new Device and License models
     db.create_all()
+
     master_user = {"user_name":"Karua", "password":"jnkarua19", "role":"Admin"}
     sales_user = {"user_name":"Wandia", "password":"evangeline", "role":"Sale"}
     inventory_user = {"user_name":"Esther", "password":"wakabari", "role":"Inventory"}
@@ -1474,19 +1499,7 @@ def init_app_db():
     create_user(sales_user)
     create_user(inventory_user)
 
-    # Create test items
-    test_item1 = {"item_code": "TEST001", "item_name": "Test Item 1", "item_description": "A test item", "item_price": 50.0, "item_type": "Test"}
-    test_item2 = {"item_code": "TEST002", "item_name": "Royal Strawberry Yoghurt 500ml", "item_description": "Strawberry yoghurt", "item_price": 100.0, "item_type": "Dairy"}
-    test_item3 = {"item_code": "TEST003", "item_name": "Test Item 3", "item_description": "Another test item", "item_price": 75.0, "item_type": "Test"}
 
-    create_sale_item(test_item1)
-    create_sale_item(test_item2)
-    create_sale_item(test_item3)
-
-    # Create stock for items
-    update_sale_item_stock_count({"item_code": "TEST001", "item_stock": 10, "re_stock_value": 5})
-    update_sale_item_stock_count({"item_code": "TEST002", "item_stock": 20, "re_stock_value": 10})
-    update_sale_item_stock_count({"item_code": "TEST003", "item_stock": 15, "re_stock_value": 8})
     
 
 
@@ -1792,9 +1805,395 @@ def download_sale_receipt(sale_id):
     response.headers['Content-Disposition'] = f'attachment; filename=receipt_{sale_record.uid}.pdf'
     return response
 
+# Micro-Server API Endpoints for APK Integration
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint for micro-server status"""
+    return jsonify({
+        "status": "ok",
+        "timestamp": datetime.now().isoformat(),
+        "server": "BluPOS Micro-Server",
+        "version": __version__
+    })
+
+@app.route('/activate', methods=['POST'])
+def device_activation():
+    """Device activation and license management endpoint"""
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({"status": "error", "message": "No data provided"}), 400
+
+        action = data.get('action')
+
+        if not action:
+            return jsonify({"status": "error", "message": "Missing action"}), 400
+
+        # For polling actions (check_expiry), use existing device or return first_time
+        if action != 'first_time':
+            existing_device = Device.query.first()
+            if existing_device:
+                device_id = existing_device.device_id
+                # Update last seen for polling
+                existing_device.last_seen = datetime.now()
+                db.session.commit()
+                print(f"� Checking device: {device_id}")
+            else:
+                # No device exists yet, return first_time state
+                return jsonify({
+                    "status": "success",
+                    "app_state": "first_time",
+                    "message": "No device activated yet"
+                })
+        else:
+            # First-time activation: Use PERSISTENT device (create only if none exists)
+            print("🔧 First-time activation: Checking for persistent device...")
+
+            existing_device = Device.query.first()
+            if existing_device:
+                # USE the existing persistent device
+                device_id = existing_device.device_id
+                print(f"🔄 Using persistent device: {device_id}")
+            else:
+                # Create the PERSISTENT device (only happens once ever)
+                device_id = f"device_{int(datetime.now().timestamp() * 1000)}"
+                print(f"🔧 Generated PERSISTENT Device ID: {device_id}")
+
+                device = Device(device_id=device_id, device_type='web')
+                db.session.add(device)
+                db.session.commit()
+                print(f"📱 PERSISTENT device created: {device_id} (Will be reused forever)")
+
+        if action == 'first_time':
+            activation_code = data.get('activation_code')
+            if not activation_code:
+                return jsonify({"status": "error", "message": "Missing activation_code"}), 400
+
+            # Validate activation code
+            valid_codes = ['BLUPOS2025', 'DEMO2025']
+            if activation_code not in valid_codes:
+                return jsonify({"status": "error", "message": "Invalid activation code"}), 400
+
+            # Check if device already activated (one license per device)
+            existing_license = License.query.filter_by(device_id=device_id).first()
+            if existing_license:
+                return jsonify({"status": "error", "message": "Device already activated"}), 400
+
+            # Determine license type and duration - ENFORCED: Only 2 license types
+            if activation_code == 'BLUPOS2025':
+                license_type = 'BLUPOS2025'
+                license_days = 366  # 1 year
+            else:  # DEMO2025
+                license_type = 'DEMO2025'
+                license_days = 183  # 6 months
+
+            # Create new license
+            expiry_date = datetime.now() + timedelta(days=license_days)
+            license_data = {
+                "license_key": f"{license_type}|{device_id}",
+                "license_type": license_type,
+                "license_status": True,
+                "license_expiry": expiry_date
+            }
+
+            result = create_license(license_data, device_id)
+            if result:
+                return jsonify({
+                    "status": "success",
+                    "message": "Device activated successfully",
+                    "device_id": device_id,
+                    "license_expiry": expiry_date.isoformat(),
+                    "app_state": "active",
+                    "license_type": license_type,
+                    "license_days": license_days
+                })
+            else:
+                return jsonify({"status": "error", "message": "Failed to create license"}), 500
+
+        elif action == 'check_expiry':
+            # Check current license status - one license per device
+            license = License.query.filter_by(device_id=device_id).first()
+            if not license:
+                return jsonify({
+                    "status": "success",
+                    "app_state": "first_time",
+                    "message": "Device not activated"
+                })
+
+            now = datetime.now()
+            if license.license_status and license.license_expiry > now:
+                days_remaining = (license.license_expiry - now).days
+                return jsonify({
+                    "status": "success",
+                    "app_state": "active",
+                    "device_id": device_id,  # Include device_id in response
+                    "license_expiry": license.license_expiry.isoformat(),
+                    "days_remaining": days_remaining,
+                    "license_type": license.license_type
+                })
+            else:
+                days_overdue = (now - license.license_expiry).days if license.license_expiry < now else 0
+                return jsonify({
+                    "status": "success",
+                    "app_state": "expired",
+                    "device_id": device_id,  # Include device_id in response
+                    "license_expiry": license.license_expiry.isoformat(),
+                    "days_overdue": days_overdue,
+                    "license_type": license.license_type
+                })
+
+        elif action == 'reactivate':
+            activation_code = data.get('activation_code')
+            if not activation_code:
+                return jsonify({"status": "error", "message": "Missing activation_code"}), 400
+
+            # Validate activation code
+            valid_codes = ['BLUPOS2025', 'DEMO2025']
+            if activation_code not in valid_codes:
+                return jsonify({"status": "error", "message": "Invalid activation code"}), 400
+
+            # Check if device exists
+            device = Device.query.filter_by(device_id=device_id).first()
+            if not device:
+                return jsonify({"status": "error", "message": "Device not found"}), 404
+
+            # Check if license exists for this device
+            existing_license = License.query.filter_by(device_id=device_id).first()
+
+            # Determine license type and duration - ENFORCED: Only 2 license types
+            if activation_code == 'BLUPOS2025':
+                license_type = 'BLUPOS2025'
+                license_days = 366  # 1 year
+            else:  # DEMO2025
+                license_type = 'DEMO2025'
+                license_days = 183  # 6 months
+
+            if existing_license:
+                # Update existing license
+                existing_license.license_type = license_type
+                existing_license.license_status = True
+                existing_license.license_expiry = datetime.now() + timedelta(days=license_days)
+                existing_license.updated_at = datetime.now()
+                db.session.commit()
+
+                return jsonify({
+                    "status": "success",
+                    "message": "License reactivated successfully",
+                    "license_expiry": existing_license.license_expiry.isoformat(),
+                    "app_state": "active",
+                    "license_type": license_type
+                })
+            else:
+                # No license exists (after reset), create new one
+                expiry_date = datetime.now() + timedelta(days=license_days)
+                license_data = {
+                    "license_key": f"{license_type}|{device_id}",
+                    "license_type": license_type,
+                    "license_status": True,
+                    "license_expiry": expiry_date
+                }
+
+                result = create_license(license_data, device_id)
+                if result:
+                    return jsonify({
+                        "status": "success",
+                        "message": "License created successfully",
+                        "license_expiry": expiry_date.isoformat(),
+                        "app_state": "active",
+                        "license_type": license_type
+                    })
+                else:
+                    return jsonify({"status": "error", "message": "Failed to create license"}), 500
+
+        elif action == 'next_1_min_expiry':
+            # Check if license exists for this device
+            existing_license = License.query.filter_by(device_id=device_id).first()
+            if not existing_license:
+                return jsonify({"status": "error", "message": "Device not found"}), 404
+
+            # Set expiry to next 1 minute for testing
+            existing_license.license_status = True
+            existing_license.license_expiry = datetime.now() + timedelta(minutes=1)
+            db.session.commit()
+
+            return jsonify({
+                "status": "success",
+                "message": "License set to expire in 1 minute",
+                "app_state": "active",
+                "license_expiry": existing_license.license_expiry.isoformat()
+            })
+
+        else:
+            return jsonify({"status": "error", "message": "Invalid action"}), 400
+
+    except Exception as e:
+        print(f"Activation error: {e}")
+        return jsonify({"status": "error", "message": "Internal server error"}), 500
+
+@app.route('/test', methods=['POST'])
+def test_endpoint():
+    """Testing utilities for UI state management"""
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({"status": "error", "message": "No data provided"}), 400
+
+        action = data.get('action')
+        device_id = data.get('device_id')
+
+        if not action:
+            return jsonify({"status": "error", "message": "Missing action"}), 400
+
+        if action == 'force_expiry':
+            if not device_id:
+                return jsonify({"status": "error", "message": "Missing device_id"}), 400
+
+            license = License.query.filter_by(device_id=device_id).first()
+            if not license:
+                return jsonify({"status": "error", "message": "Device not found"}), 404
+
+            # Force expiry by setting past date
+            license.license_status = False
+            license.license_expiry = datetime.now() - timedelta(days=1)
+            db.session.commit()
+
+            return jsonify({
+                "status": "success",
+                "message": "License expired",
+                "app_state": "expired",
+                "license_expiry": "EXPIRED"
+            })
+
+        elif action == 'reset_first_time':
+            if not device_id:
+                return jsonify({"status": "error", "message": "Missing device_id"}), 400
+
+            license = License.query.filter_by(device_id=device_id).first()
+            if license:
+                db.session.delete(license)
+                db.session.commit()
+
+            return jsonify({
+                "status": "success",
+                "message": "Reset to first time",
+                "app_state": "first_time"
+            })
+
+        elif action == 'update_license':
+            license_type = data.get('license_type')
+            if not device_id or not license_type:
+                return jsonify({"status": "error", "message": "Missing device_id or license_type"}), 400
+
+            valid_types = ['BLUPOS2025', 'DEMO2025']
+            if license_type not in valid_types:
+                return jsonify({"status": "error", "message": "Invalid license type. Use BLUPOS2025 or DEMO2025"}), 400
+
+            # Check if device exists
+            device = Device.query.filter_by(device_id=device_id).first()
+            if not device:
+                return jsonify({"status": "error", "message": "Device not found"}), 404
+
+            # Check if license exists for this device
+            license = License.query.filter_by(device_id=device_id).first()
+
+            if license:
+                # Update existing license
+                license.license_type = license_type
+                if license_type == 'BLUPOS2025':
+                    license.license_expiry = datetime.now() + timedelta(days=366)  # 1 year
+                else:  # DEMO2025
+                    license.license_expiry = datetime.now() + timedelta(days=183)  # 6 months
+                license.license_status = True
+                db.session.commit()
+
+                return jsonify({
+                    "status": "success",
+                    "message": "License updated",
+                    "license_type": license_type,
+                    "license_expiry": license.license_expiry.isoformat()
+                })
+            else:
+                # No license exists, create new one
+                license_days = 366 if license_type == 'BLUPOS2025' else 183  # ENFORCED: 1 year or 6 months
+                expiry_date = datetime.now() + timedelta(days=license_days)
+
+                license_data = {
+                    "license_key": f"{license_type}|{device_id}",
+                    "license_type": license_type,
+                    "license_status": True,
+                    "license_expiry": expiry_date
+                }
+
+                result = create_license(license_data, device_id)
+                if result:
+                    return jsonify({
+                        "status": "success",
+                        "message": "License created",
+                        "license_type": license_type,
+                        "license_expiry": expiry_date.isoformat()
+                    })
+                else:
+                    return jsonify({"status": "error", "message": "Failed to create license"}), 500
+
+        elif action == 'next_1_min_expiry':
+            if not device_id:
+                return jsonify({"status": "error", "message": "Missing device_id"}), 400
+
+            license = License.query.filter_by(device_id=device_id).first()
+            if not license:
+                return jsonify({"status": "error", "message": "Device not found"}), 404
+
+            # Set expiry to next 1 minute for testing
+            license.license_status = True
+            license.license_expiry = datetime.now() + timedelta(minutes=1)
+            db.session.commit()
+
+            return jsonify({
+                "status": "success",
+                "message": "License set to expire in 1 minute",
+                "app_state": "active",
+                "license_expiry": license.license_expiry.isoformat()
+            })
+
+        elif action == 'get_status':
+            if not device_id:
+                return jsonify({"status": "error", "message": "Missing device_id"}), 400
+
+            license = License.query.filter_by(device_id=device_id).first()
+
+            if not license:
+                return jsonify({
+                    "status": "success",
+                    "app_state": "first_time",
+                    "license_type": None,
+                    "license_expiry": None,
+                    "activation_code": None
+                })
+
+            now = datetime.now()
+            app_state = "active" if license.license_status and license.license_expiry > now else "expired"
+
+            return jsonify({
+                "status": "success",
+                "app_state": app_state,
+                "license_type": license.license_type,
+                "license_expiry": license.license_expiry.isoformat(),
+                "days_remaining": max(0, (license.license_expiry - now).days),
+                "activation_code": license.license_key.split('|')[0] if '|' in license.license_key else license.license_key
+            })
+
+        else:
+            return jsonify({"status": "error", "message": "Invalid action"}), 400
+
+    except Exception as e:
+        print(f"Test endpoint error: {e}")
+        return jsonify({"status": "error", "message": "Internal server error"}), 500
+
 def run_heroku_mode():
     h_port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=h_port, debug=True)
-    
-if __name__ == "__main__":  
+
+if __name__ == "__main__":
     run_heroku_mode()

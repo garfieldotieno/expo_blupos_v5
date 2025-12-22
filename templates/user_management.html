@@ -2,6 +2,175 @@
 
 {% block content %}
 <br>
+<!-- Payments Interface Master Section - Outside .container for true 95% screen width -->
+<div id="payments-interface-container" style="width: 95%; margin-left: auto; margin-right: auto; margin-top: 48px; background-color: #D7D7D7; border-radius: 15px; padding: 16px;">
+    <p class="spacer" style="height: 12px;">
+
+    </p>
+    <h3 class="text-center" style="margin-bottom: 16px;"><b>Payments Interface</b></h3>
+
+    <div class="row" style="margin-left: 2%; margin-right: 2%;">
+        <!-- APK Interface Replication - Restore 1:3 ratio -->
+        <div class="col-4" style="padding: 8px;">
+            <div style="background-color: #FEC620; min-height: 300px; padding: 16px; border-radius: 8px; position: relative; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                <!-- Device ID - Top Left -->
+                <div id="device-id-display" style="position: absolute; top: 16px; left: 16px; color: #333; font-size: 10px; font-weight: bold;">
+                    --
+                </div>
+
+                <!-- Network Time - Top Right -->
+                <div id="network-time-display" style="position: absolute; top: 16px; right: 16px; color: #333; font-size: 12px; font-weight: bold;">
+                    --
+                </div>
+
+                <!-- Total Processed Amount - Center -->
+                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
+                    <div style="color: #333; font-size: 14px; margin-bottom: 8px;">Total Processed</div>
+                    <div id="total-balance-text" style="color: #333; font-size: 28px; font-weight: bold;">KES 0.00</div>
+                </div>
+
+                <!-- License Status & Expiry - Always Visible Bottom -->
+                <div style="position: absolute; bottom: 16px; left: 16px; right: 16px; display: flex; justify-content: space-between; align-items: center;">
+                    <!-- License Status - Bottom Left -->
+                    <div style="color: #333; font-size: 12px;">
+                        <div style="font-weight: bold;">License Status</div>
+                        <div id="license-status-text">Not Activated</div>
+                    </div>
+
+                    <!-- Expiry Info - Bottom Right -->
+                    <div style="color: #333; font-size: 12px; text-align: right;">
+                        <div style="font-weight: bold;">Expiry</div>
+                        <div id="expiry-date-text">--/--/----</div>
+                    </div>
+                </div>
+
+                <!-- Bottom Section - First Time State (Overlay) -->
+                <div id="first-time-section" style="position: absolute; bottom: 16px; left: 16px; right: 16px; display: none; justify-content: space-between; align-items: center; background-color: rgba(254, 198, 32, 0.9); padding: 8px; border-radius: 6px;">
+                    <div style="color: #333; font-size: 12px; font-weight: bold;">
+                        Device Not Activated
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Activation Button - Visual Only (No Actions) - Immediately after yellow card -->
+            <div id="activation-button-container" style="margin-top: 16px;">
+                <button id="apk-activate-btn" style="background-color: #182A62; color: white; border: none; padding: 29px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; width: 100%; cursor: default;" disabled>
+                    Activate Device
+                </button>
+            </div>
+
+            <!-- Reactivate Button - For Expired State - Immediately after yellow card -->
+            <div id="reactivate-button-container" style="margin-top: 16px; display: none;">
+                <button id="reactivate-btn" style="background-color: #28a745; color: white; border: none; padding: 29px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; width: 100%; cursor: pointer;">
+                    Reactivate License
+                </button>
+            </div>
+
+            <!-- State Sections Container - For Smooth Transitions -->
+            <div id="state-sections-container" style="margin-top: 16px; position: relative; overflow: visible; min-height: 600px;">
+                <!-- Active State Section -->
+                <div id="active-state-section" style="position: absolute; width: 100%; transition: transform 0.3s ease-in-out;">
+                    <!-- Report Button -->
+                    <div style="text-align: center; margin-bottom: 8px;">
+                        <button id="report-btn" style="background-color: #182A62; color: white; border: none; padding: 29px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; width: 100%; cursor: pointer;">
+                            Report
+                        </button>
+                    </div>
+
+                    <!-- Latest Payments (4 items) - Individual White Buttons -->
+                    <div style="text-align: center; margin-bottom: 8px;">
+                        <div style="margin-bottom: 8px; font-weight: bold; color: #333; font-size: 14px;">Latest Payments:</div>
+                        <div id="latest-payments" style="display: flex; flex-direction: column; gap: 8px;">
+                            <div style="background-color: white; border: 1px solid #ddd; padding: 29px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; color: #333; text-align: left; cursor: default; width: 100%;">
+                                Payment 1 - KES 500.00
+                            </div>
+                            <div style="background-color: white; border: 1px solid #ddd; padding: 29px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; color: #333; text-align: left; cursor: default; width: 100%;">
+                                Payment 2 - KES 750.00
+                            </div>
+                            <div style="background-color: white; border: 1px solid #ddd; padding: 29px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; color: #333; text-align: left; cursor: default; width: 100%;">
+                                Payment 3 - KES 320.00
+                            </div>
+                            <div style="background-color: white; border: 1px solid #ddd; padding: 29px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; color: #333; text-align: left; cursor: default; width: 100%;">
+                                Payment 4 - KES 1,200.00
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Share Button -->
+                    <div style="text-align: center;">
+                        <button id="share-btn" style="background-color: #182A62; color: white; border: none; padding: 29px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; width: 100%; cursor: pointer;">
+                            Share
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Reports Interface -->
+                <div id="reports-interface" style="position: absolute; width: 100%; transform: translateX(100%); transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out, visibility 0.3s ease-in-out; opacity: 0; visibility: hidden; pointer-events: none;">
+                    <div style="padding: 16px; border-radius: 8px; min-height: 200px; background-color: transparent;">
+                        <!-- Back Button -->
+                        <div style="text-align: center; margin-bottom: 12px;">
+                            <button id="back-btn" style="background-color: #182A62; color: white; border: none; padding: 29px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; width: 100%; cursor: pointer;">
+                                ← Back
+                            </button>
+                        </div>
+
+                        <!-- Reports Content -->
+                        <div style="text-align: center;">
+                            <h4 style="color: #333; margin-bottom: 16px;">Payment Reports</h4>
+
+                            <!-- Report Options - Replacing Payment Items -->
+                            <div style="margin-bottom: 16px;">
+                                <div style="margin-bottom: 8px; font-weight: bold; color: #333; font-size: 14px;">Reports:</div>
+                                <div style="display: flex; flex-direction: column; gap: 8px;">
+                                    <button class="report-option-btn" data-report="checkout" style="background-color: #28a745; color: white; border: none; padding: 29px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; text-align: left; cursor: pointer; width: 100%;">
+                                        Sales/Checkout
+                                    </button>
+                                    <button class="report-option-btn" data-report="items" style="background-color: #28a745; color: white; border: none; padding: 29px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; text-align: left; cursor: pointer; width: 100%;">
+                                        Items
+                                    </button>
+                                    <button class="report-option-btn" data-report="analysis" style="background-color: #28a745; color: white; border: none; padding: 29px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; text-align: left; cursor: pointer; width: 100%;">
+                                        Item Analysis*
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Print Button - Replacing Share Button -->
+                            <div>
+                                <button id="print-report-btn" style="background-color: #182A62; color: white; border: none; padding: 29px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; width: 100%; cursor: pointer;">
+                                    🖨️ Print Report
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Expired State Section - Below Yellow Card -->
+            <div id="expired-state-section" style="margin-top: 16px; display: none;">
+                <button id="reactivate-btn" style="background-color: #28a745; color: white; border: none; padding: 29px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; width: 100%; cursor: pointer;">
+                    Reactivate License
+                </button>
+            </div>
+        </div>
+
+        <!-- Future Content - Restore 2:3 ratio -->
+        <div class="col-8" style="padding: 8px;">
+            <div class="info_pad" style="background-color: #FEC620; min-height: 300px; padding: 16px; border-radius: 8px;">
+                <h5 class="text-center" style="color: #333; margin-bottom: 16px;"><b>Payment Analytics</b></h5>
+                <div class="text-center" style="color: #666;">
+                    <p><i class="fa fa-chart-bar fa-3x" style="margin-bottom: 16px;"></i></p>
+                    <p>Advanced payment analytics and reporting tools</p>
+                    <small>To Be Defined</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <p class="spacer" style="height: 18px;">
+
+    </p>
+</div>
 <div class="container" style="position: relative; margin: auto;">
     <div class="middle_container">
 
@@ -32,30 +201,20 @@
             {%- endif %}
 
         
-        <!-- check if sector_a is True -->
-        {% if sector_a -%}
-            <!-- sales/users button component -->
-            
-       
-            <!-- add user componet -->
+        <!-- User Management Sections - Dynamically shown/hidden -->
+        <div id="user-management-sections" style="display: none;">
+            <!-- add user component -->
             <div class="after-container4">
-            <p class="spacer" style="height: 12px;">
-
-            </p>
+            <p class="spacer" style="height: 12px;"></p>
             <div class="info_pad">
                 <form action="/add_user" method="post" class="container">
                     <div class="row">
-                        <div class="col-1">
-        
-                        </div>
+                        <div class="col-1"></div>
                         <div class="col-10">
                             <h3 class="text-center"><b>Add User </b></h3>
                             <br>
-                            
                         </div>
-                        <div class="col-1">
-        
-                        </div>
+                        <div class="col-1"></div>
                     </div>
                     <div class="row">
                         <div class=col-6>
@@ -74,7 +233,7 @@
                                 </div>
                                 <div class="col-3">
                                     <input type="text" name="user_name" id="user_name" required>
-                                </div>  
+                                </div>
                             </div>
                             <div class="row">
                                 <div class="col-3">
@@ -96,7 +255,6 @@
                                 Passwords don't match, enter password then confirm password
                             </p>
                         </div>
-                        
                     </div>
                     <br>
                     <button class="form_product_type" type="submit" style="display: none;" id="user_submit_btn">
@@ -106,17 +264,12 @@
                     </button>
                 </form>
             </div>
-            <p class="spacer" style="height: 18px;">
-    
-            </p>
+            <p class="spacer" style="height: 18px;"></p>
             </div>
 
             <!-- list table records component-->
             <div class="after-container4" id="user_listing_container">
-            <p class="spacer" style="height: 12px;">
-
-            </p>
-            
+            <p class="spacer" style="height: 12px;"></p>
             <div class="info_pad">
                 <h3 class="text-center"><b>Accounts</b></h3>
                 <table style="width: 100%;" id="user_table">
@@ -129,50 +282,34 @@
                             <th>Action</th>
                         </tr>
                     </thead>
-                   
-                        
-                            {% for user in users -%}
-                            <tr>
-                                <td>
-                                    {{user.id}}
-                                </td>
-                                <td>
-                                    {{user.user_name}}
-                                </td>
-                                <td>
-                                    {{user.role}}
-                                </td>
-                                <td>
-                                    {{user.updated_at}}
-                                </td>
-                                <td>
-                                    <!-- check if user type is admin and then pass creating the button but show for others -->
-                                    {% if user.role == 'Admin' -%}
-
-                                    {% else -%}
-                                        <form action="/delete_user" method="post">
-                                            <input type="hidden" name="user_id" value="{{user.id}}">
-                                            <button class="form_product_type" type="submit" id="user_delete_btn">
-                                                <span class="form_upper_type_label">
-                                                    <h4 class="text-center" style="font-weight: bold; color:white">Delete</h4>
-                                                </span>
-                                            </button>
-                                        </form>
-                                    {%- endif %}
-                                </td>
-                            </tr>
-                                
-                            {%- endfor %}
-                      
-                        
-                    
+                    <tbody id="user-table-body">
+                        {% for user in users -%}
+                        <tr>
+                            <td>{{user.id}}</td>
+                            <td>{{user.user_name}}</td>
+                            <td>{{user.role}}</td>
+                            <td>{{user.updated_at}}</td>
+                            <td>
+                                {% if user.role == 'Admin' -%}
+                                {% else -%}
+                                    <form action="/delete_user" method="post">
+                                        <input type="hidden" name="user_id" value="{{user.id}}">
+                                        <button class="form_product_type" type="submit" id="user_delete_btn">
+                                            <span class="form_upper_type_label">
+                                                <h4 class="text-center" style="font-weight: bold; color:white">Delete</h4>
+                                            </span>
+                                        </button>
+                                    </form>
+                                {%- endif %}
+                            </td>
+                        </tr>
+                        {%- endfor %}
+                    </tbody>
                 </table>
             </div>
-            <p class="spacer" style="height: 18px;">
-
-            </p>
+            <p class="spacer" style="height: 18px;"></p>
             </div>
-        {% endif %}
+        </div>
 
 
         <!-- check if sector_c is True-->
@@ -389,20 +526,613 @@
             {% endif %}
             
             <p class="spacer" style="height: 18px;">
-    
+
             </p>
             </div>
         {% endif %}
 
     </div>
 </div>
+
+
 <div class="footer" style="height: 60px;">
     <p>
     </p>
 </div>
 <script>
- document.addEventListener('DOMContentLoaded', function() {
-      var dataTable = new DataTable('#user_table');
+console.log('🚀 Script loaded successfully');
+
+document.addEventListener('DOMContentLoaded', function() {
+      console.log('📄 DOM Content Loaded');
+
+      // Temporarily disable DataTable to test APK interface
+      // var dataTable = new DataTable('#user_table');
+
+      // Initialize APK interface
+      console.log('🔧 Starting APK interface initialization...');
+      initializeAPKInterface();
     });
+
+    // APK Interface - Reactive State Listener
+    let pollingInterval = null;
+    let currentDeviceId = null;
+
+    function initializeAPKInterface() {
+        console.log('🔧 Initializing APK Interface - Reactive Mode...');
+
+        // Set initial animation positions
+        initializeAnimationPositions();
+
+        // Start reactive polling
+        startReactivePolling();
+
+        // Start real-time clock
+        startRealTimeClock();
+
+        // Initial check
+        checkBackendState();
+
+        // Ensure activation button is visible and properly styled for first-time state
+        const activateBtn = document.querySelector('#apk-activate-btn');
+        if (activateBtn) {
+            console.log('🔘 Setting up activation button - visual only, no action');
+            activateBtn.style.display = 'block';
+            activateBtn.textContent = 'Activate Device';
+            activateBtn.disabled = true;
+            activateBtn.style.cursor = 'default';
+        }
+    }
+
+    function startRealTimeClock() {
+        console.log('🕐 Starting real-time clock...');
+
+        // Update immediately
+        updateNetworkTimeDisplay();
+
+        // Update every minute
+        setInterval(updateNetworkTimeDisplay, 60000);
+    }
+
+    function updateNetworkTimeDisplay() {
+        const timeElement = document.querySelector('#network-time-display');
+        if (timeElement) {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            });
+            timeElement.textContent = timeString;
+            console.log('🕐 Updated network time display:', timeString);
+        } else {
+            console.error('❌ Network time display element not found');
+        }
+    }
+
+    function initializeAnimationPositions() {
+        console.log('🎬 Setting initial animation positions...');
+
+        const activeSection = document.querySelector('#active-state-section');
+        const reportsInterface = document.querySelector('#reports-interface');
+
+        if (activeSection) {
+            activeSection.style.setProperty('transform', 'translateX(0)');
+            activeSection.style.setProperty('opacity', '1');
+            activeSection.style.setProperty('visibility', 'visible');
+            activeSection.style.setProperty('pointer-events', 'auto');
+            console.log('✅ Active section positioned at translateX(0)');
+        }
+
+        if (reportsInterface) {
+            reportsInterface.style.setProperty('transform', 'translateX(100%)');
+            reportsInterface.style.setProperty('opacity', '0');
+            reportsInterface.style.setProperty('visibility', 'hidden');
+            reportsInterface.style.setProperty('pointer-events', 'none');
+            reportsInterface.style.setProperty('display', 'block'); // Ensure it's block so transitions work
+            console.log('✅ Reports interface positioned at translateX(100%)');
+        }
+    }
+
+    function startReactivePolling() {
+        console.log('🔄 Starting reactive polling every 2 seconds...');
+        pollingInterval = setInterval(() => {
+            checkBackendState();
+        }, 2000); // Poll every 2 seconds
+    }
+
+    function stopPollingTemporarily() {
+        if (pollingInterval) {
+            clearInterval(pollingInterval);
+            pollingInterval = null;
+            console.log('⏸️ Polling paused for 30 seconds');
+
+            // Don't resume polling automatically - wait for back button
+            // setTimeout(() => {
+            //     console.log('▶️ Resuming polling after 30 seconds');
+            //     startReactivePolling();
+            // }, 30000); // 30 seconds
+        } else {
+            console.log('ℹ️ No active polling interval to pause');
+        }
+    }
+
+    async function checkBackendState() {
+        try {
+            console.log('🔍 Checking backend state...');
+
+            // First, check if we have a device ID to query
+            if (!currentDeviceId) {
+                // Try to get device ID from localStorage or generate one
+                currentDeviceId = localStorage.getItem('device_id');
+                if (!currentDeviceId) {
+                    console.log('🆔 No device ID found, will check backend for existing devices');
+                }
+            }
+
+            // Check license status using the check_expiry endpoint
+            const statusResponse = await fetch('http://localhost:8080/activate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'check_expiry',
+                    device_id: currentDeviceId || 'unknown'
+                })
+            });
+
+            if (!statusResponse.ok) {
+                console.error('❌ Backend state check failed:', statusResponse.status);
+                return;
+            }
+
+            const statusResult = await statusResponse.json();
+            console.log('📊 Backend state received:', statusResult);
+
+            // Update UI based on backend response
+            updateUIFromBackend(statusResult);
+
+        } catch (error) {
+            console.error('❌ Backend state check error:', error);
+        }
+    }
+
+    function updateUIFromBackend(backendState) {
+        console.log('🔄 Updating UI from backend state:', backendState);
+
+        const appState = backendState.app_state; // 'first_time', 'active', or 'expired'
+        const licenseType = backendState.license_type;
+        const licenseExpiry = backendState.license_expiry;
+        const daysRemaining = backendState.days_remaining;
+
+        // Determine activation status
+        const isActivated = appState === 'active';
+        const isExpired = appState === 'expired';
+        const isFirstTime = appState === 'first_time';
+
+        console.log('📊 Parsed state:', { appState, isActivated, isExpired, isFirstTime, licenseType, licenseExpiry });
+
+        // Update yellow card content
+        console.log('🎨 Updating yellow card from backend...');
+        updateYellowCardFromBackend(isActivated, isExpired, isFirstTime, licenseType, licenseExpiry, daysRemaining);
+
+        // Update container background based on state
+        const paymentsContainer = document.querySelector('#payments-interface-container');
+        if (paymentsContainer) {
+            let newColor = '#D7D7D7'; // Default grey
+            if (isActivated) newColor = '#90EE90'; // Light green for active
+            if (isExpired) newColor = '#FFB6C1'; // Light red for expired
+
+            console.log('🎨 Updating container background:', newColor);
+            paymentsContainer.style.backgroundColor = newColor;
+        }
+
+        // Dynamically show/hide user management sections based on device state
+        const userManagementSections = document.querySelector('#user-management-sections');
+        if (userManagementSections) {
+            const shouldShow = isActivated || isExpired;
+            const newDisplay = shouldShow ? 'block' : 'none';
+            console.log('👥 Updating user management sections visibility:', newDisplay);
+            userManagementSections.style.display = newDisplay;
+
+            // Update page title based on state
+            const titleElement = document.querySelector('h3.text-center b');
+            if (titleElement) {
+                const newTitle = shouldShow ? 'BluPOS Management' : 'Payment';
+                console.log('📝 Updating page title:', newTitle);
+                titleElement.textContent = newTitle;
+            }
+        }
+
+        // Store current device ID if available
+        if (backendState.device_id && backendState.device_id !== 'unknown') {
+            currentDeviceId = backendState.device_id;
+            console.log('🆔 Updated current device ID:', currentDeviceId);
+        }
+    }
+
+    function updateYellowCardFromBackend(isActivated, isExpired, isFirstTime, licenseType, licenseExpiry, daysRemaining) {
+        console.log('🎨 updateYellowCardFromBackend called with:', {
+            isActivated, isExpired, isFirstTime, licenseType, licenseExpiry, daysRemaining
+        });
+        console.log('🆔 Current deviceId variable:', currentDeviceId);
+
+        // Show/hide appropriate card sections based on state
+        showCardSection(isFirstTime, isActivated, isExpired);
+
+        // Update device ID display (top-left) - show numerals only
+        const deviceIdElement = document.querySelector('#device-id-display');
+        if (deviceIdElement) {
+            let deviceDisplay = '--';
+            if (currentDeviceId && currentDeviceId.startsWith('device_')) {
+                // Extract numerals after 'device_'
+                deviceDisplay = currentDeviceId.replace('device_', '');
+                console.log('🧮 Extracted device numerals:', deviceDisplay, 'from:', currentDeviceId);
+            } else {
+                console.log('⚠️ No valid device ID for display:', currentDeviceId);
+            }
+            console.log('🆔 Setting device ID display to:', deviceDisplay);
+            deviceIdElement.textContent = deviceDisplay;
+
+            // Force a visual update check
+            console.log('🔍 Element content after update:', deviceIdElement.textContent);
+        } else {
+            console.error('❌ Device ID display element not found in DOM');
+            console.log('🔍 Available elements with "device" in ID:', Array.from(document.querySelectorAll('[id*="device"]')).map(el => el.id));
+        }
+
+        // Update license status
+        const statusElement = document.querySelector('#license-status-text');
+        if (statusElement) {
+            let newStatus = 'Not Activated';
+            if (isActivated) newStatus = 'Active';
+            if (isExpired) newStatus = 'Expired';
+            console.log('📋 Updating license status:', newStatus);
+            statusElement.textContent = newStatus;
+        } else {
+            console.error('❌ License status element not found');
+        }
+
+        // Update expiry date
+        const expiryElement = document.querySelector('#expiry-date-text');
+        if (expiryElement) {
+            let expiryDisplay = '--/--/----';
+            if ((isActivated || isExpired) && licenseExpiry) {
+                const expiryDate = new Date(licenseExpiry);
+                expiryDisplay = expiryDate.toLocaleDateString();
+                if (daysRemaining !== undefined) {
+                    expiryDisplay += ` (${daysRemaining}d)`;
+                }
+            }
+            console.log('📅 Updating expiry date:', expiryDisplay);
+            expiryElement.textContent = expiryDisplay;
+        } else {
+            console.error('❌ Expiry date element not found');
+        }
+
+        // Update balance display
+        const balanceElement = document.querySelector('#total-balance-text');
+        if (balanceElement) {
+            let newBalance = 'KES 0.00';
+            if (isActivated) newBalance = 'KES 12,345.67';
+            if (isExpired) newBalance = 'KES 0.00';
+            console.log('💰 Updating balance display:', newBalance);
+            balanceElement.textContent = newBalance;
+        } else {
+            console.error('❌ Balance display element not found');
+        }
+    }
+
+    function showCardSection(isFirstTime, isActivated, isExpired) {
+        console.log('🔄 Showing card section:', { isFirstTime, isActivated, isExpired });
+
+        // Debug: Check if elements exist
+        const firstTimeSection = document.querySelector('#first-time-section');
+        const activeSection = document.querySelector('#active-state-section');
+        const expiredSection = document.querySelector('#expired-state-section');
+        const reportsInterface = document.querySelector('#reports-interface');
+        const activationButtonContainer = document.querySelector('#activation-button-container');
+        const reactivateButtonContainer = document.querySelector('#reactivate-button-container');
+
+        console.log('🔍 Element existence check:', {
+            firstTimeSection: !!firstTimeSection,
+            activeSection: !!activeSection,
+            expiredSection: !!expiredSection,
+            reportsInterface: !!reportsInterface,
+            activationButtonContainer: !!activationButtonContainer,
+            reactivateButtonContainer: !!reactivateButtonContainer
+        });
+
+        // Hide all sections first
+        if (firstTimeSection) firstTimeSection.style.display = 'none';
+        if (activeSection) activeSection.style.display = 'none';
+        if (expiredSection) expiredSection.style.display = 'none';
+        if (reportsInterface) reportsInterface.style.display = 'none';
+        if (activationButtonContainer) activationButtonContainer.style.display = 'none';
+        if (reactivateButtonContainer) reactivateButtonContainer.style.display = 'none';
+
+        // Show appropriate section
+        if (isFirstTime) {
+            console.log('🎯 First-time state detected - showing activation button');
+            if (activationButtonContainer) {
+                activationButtonContainer.style.display = 'block';
+                console.log('✅ Showing activation button container');
+            } else {
+                console.error('❌ Activation button container not found');
+            }
+        } else if (isActivated) {
+            if (activeSection) {
+                activeSection.style.display = 'block';
+                console.log('✅ Showing active state section');
+
+                // Add event listeners for active state buttons
+                setupActiveStateButtons();
+            }
+        } else if (isExpired) {
+            console.log('🎯 Expired state detected - showing reactivate button immediately after yellow card');
+            if (reactivateButtonContainer) {
+                reactivateButtonContainer.style.display = 'block';
+                console.log('✅ Showing reactivate button container');
+
+                // Add event listener for reactivate button (visual only)
+                setupExpiredStateButtons();
+            } else {
+                console.error('❌ Reactivate button container not found');
+            }
+        } else {
+            console.log('⚠️ Unknown state - defaulting to first-time');
+            if (activationButtonContainer) {
+                activationButtonContainer.style.display = 'block';
+                console.log('✅ Showing activation button container (fallback)');
+            }
+        }
+    }
+
+    function setupActiveStateButtons() {
+        console.log('🔧 Setting up active state buttons...');
+
+        // Report button - shows reports interface with animation
+        const reportBtn = document.querySelector('#report-btn');
+        if (reportBtn) {
+            reportBtn.onclick = function() {
+                console.log('🎯 REPORT BUTTON PRESSED - PAUSING POLLING FOR 30 SECONDS');
+                console.log('🔄 Stopping background polling...');
+                stopPollingTemporarily();
+                console.log('🎬 Initiating reports animation...');
+                animateToReports();
+            };
+            console.log('✅ Report button handler configured');
+        } else {
+            console.error('❌ Report button not found in DOM');
+            console.log('🔍 Available buttons:', Array.from(document.querySelectorAll('button')).map(btn => btn.id));
+        }
+
+        // Share button - placeholder
+        const shareBtn = document.querySelector('#share-btn');
+        if (shareBtn) {
+            shareBtn.onclick = function() {
+                console.log('📤 Share button clicked');
+                alert('Share functionality - Coming Soon!');
+            };
+        }
+    }
+
+    function setupExpiredStateButtons() {
+        // Reactivate button - visual only (no action)
+        const reactivateBtn = document.querySelector('#reactivate-btn');
+        if (reactivateBtn) {
+            reactivateBtn.onclick = function() {
+                console.log('🔄 Reactivate button clicked - visual only');
+                // No action - visual consistency with APK
+            };
+        }
+    }
+
+    function animateToReports() {
+        console.log('🎬 Starting push-left animation to reports...');
+
+        const activeSection = document.querySelector('#active-state-section');
+        const reportsInterface = document.querySelector('#reports-interface');
+
+        if (!activeSection || !reportsInterface) {
+            console.error('❌ Critical animation elements not found in DOM');
+            console.log('🔍 Available elements:', {
+                activeSection: document.querySelector('#active-state-section'),
+                reportsInterface: document.querySelector('#reports-interface')
+            });
+            return;
+        }
+
+        console.log('✅ Elements found - applying animation styles...');
+
+        try {
+            // Push active section left and hide it
+            activeSection.style.setProperty('transform', 'translateX(-100%)');
+            activeSection.style.setProperty('opacity', '0');
+            activeSection.style.setProperty('pointer-events', 'none');
+
+            // Bring reports interface in from right and make it visible
+            reportsInterface.style.setProperty('transform', 'translateX(0)');
+            reportsInterface.style.setProperty('opacity', '1');
+            reportsInterface.style.setProperty('visibility', 'visible');
+            reportsInterface.style.setProperty('pointer-events', 'auto');
+
+            // Force a reflow to ensure the visibility change takes effect
+            reportsInterface.style.display = 'block';
+
+            // Force reflow to ensure styles are applied
+            activeSection.offsetHeight;
+            reportsInterface.offsetHeight;
+
+            // Setup back button after animation completes
+            setTimeout(() => {
+                console.log('⏰ Animation complete - setting up reports interface');
+                setupReportsInterface();
+            }, 300);
+        } catch (error) {
+            console.error('❌ Animation error:', error);
+        }
+    }
+
+    function animateBackToActive() {
+        console.log('🎬 Starting reverse animation back to active...');
+
+        const activeSection = document.querySelector('#active-state-section');
+        const reportsInterface = document.querySelector('#reports-interface');
+
+        if (!activeSection || !reportsInterface) {
+            console.error('❌ Animation elements not found');
+            return;
+        }
+
+        try {
+            // Push reports interface right and hide it
+            reportsInterface.style.transform = 'translateX(100%)';
+            reportsInterface.style.opacity = '0';
+            reportsInterface.style.visibility = 'hidden';
+            reportsInterface.style.pointerEvents = 'none';
+
+            // Bring active section back from left and make it visible
+            activeSection.style.transform = 'translateX(0)';
+            activeSection.style.opacity = '1';
+            activeSection.style.pointerEvents = 'auto';
+
+            // Resume polling when going back to active state
+            startReactivePolling();
+
+            // Re-setup active state buttons after animation completes
+            setTimeout(() => {
+                console.log('⏰ Animation complete - re-setting up active buttons');
+                setupActiveStateButtons();
+            }, 300); // Match transition duration
+        } catch (error) {
+            console.error('❌ Animation error:', error);
+        }
+    }
+
+    function setupReportsInterface() {
+        console.log('🔧 Setting up reports interface...');
+
+        const backBtn = document.querySelector('#back-btn');
+        const reportButtons = document.querySelectorAll('.report-option-btn');
+        const printBtn = document.querySelector('#print-report-btn');
+
+        // Back button - reverse animation back to active state
+        if (backBtn) {
+            backBtn.onclick = function() {
+                console.log('⬅️ Back button clicked - animating back to active state');
+                animateBackToActive();
+            };
+        }
+
+        // Report option buttons
+        reportButtons.forEach(btn => {
+            btn.onclick = function() {
+                const reportType = this.getAttribute('data-report');
+                console.log('📋 Report option clicked:', reportType);
+                alert(`Report: ${reportType} - Coming Soon!`);
+            };
+        });
+
+        // Print button
+        if (printBtn) {
+            printBtn.onclick = function() {
+                console.log('🖨️ Print report clicked');
+                alert('Print functionality - Coming Soon!');
+            };
+        }
+    }
+
+    function updateYellowCard(isActivated, licenseType, licenseExpiry, deviceId) {
+        console.log('🎨 updateYellowCard called with:', { isActivated, licenseType, licenseExpiry, deviceId });
+
+        // Update device ID display (top-left) - show numerals only
+        const deviceIdElement = document.querySelector('#device-id-display');
+        if (deviceIdElement) {
+            let deviceDisplay = '--';
+            if (isActivated && deviceId && deviceId.startsWith('device_')) {
+                // Extract numerals after 'device_'
+                deviceDisplay = deviceId.replace('device_', '');
+            }
+            console.log('🆔 Updating device ID display:', deviceDisplay);
+            deviceIdElement.textContent = deviceDisplay;
+        } else {
+            console.error('❌ Device ID display element not found');
+        }
+
+        // Update license status
+        const statusElement = document.querySelector('#license-status-text');
+        if (statusElement) {
+            const newStatus = isActivated ? 'Active' : 'Not Activated';
+            console.log('📋 Updating license status:', newStatus);
+            statusElement.textContent = newStatus;
+        } else {
+            console.error('❌ License status element not found');
+        }
+
+        // Update expiry date
+        const expiryElement = document.querySelector('#expiry-date-text');
+        if (expiryElement) {
+            let expiryDisplay = '--/--/----';
+            if (isActivated && licenseExpiry) {
+                const expiryDate = new Date(licenseExpiry);
+                expiryDisplay = expiryDate.toLocaleDateString();
+            }
+            console.log('📅 Updating expiry date:', expiryDisplay);
+            expiryElement.textContent = expiryDisplay;
+        } else {
+            console.error('❌ Expiry date element not found');
+        }
+
+        // Update balance display
+        const balanceElement = document.querySelector('#total-balance-text');
+        if (balanceElement) {
+            const newBalance = isActivated ? 'KES 12,345.67' : 'KES 0.00';
+            console.log('💰 Updating balance display:', newBalance);
+            balanceElement.textContent = newBalance;
+        } else {
+            console.error('❌ Balance display element not found');
+        }
+    }
+
+    // Test functions for UI state changes (similar to Flutter test endpoints)
+    async function forceExpiry() {
+        try {
+            const deviceId = localStorage.getItem('device_id');
+            if (!deviceId) {
+                alert('No device ID found. Please activate first.');
+                return;
+            }
+
+            const response = await fetch('http://localhost:8080/test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'force_expiry',
+                    device_id: deviceId
+                })
+            });
+
+            const result = await response.json();
+            if (result.status === 'success') {
+                localStorage.setItem('device_activated', 'false');
+                updateUIFromState();
+                alert('License expired (test mode)');
+            }
+        } catch (error) {
+            console.error('Test expiry error:', error);
+        }
+    }
+
+    async function resetToFirstTime() {
+        localStorage.removeItem('device_activated');
+        localStorage.removeItem('device_id');
+        localStorage.removeItem('license_type');
+        localStorage.removeItem('license_expiry');
+        updateUIFromState();
+        alert('Reset to first-time state');
+    }
+
+    // Make functions globally available for testing
+    window.forceExpiry = forceExpiry;
+    window.resetToFirstTime = resetToFirstTime;
 </script>
 {% endblock content %}

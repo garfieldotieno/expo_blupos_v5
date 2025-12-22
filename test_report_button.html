@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report Button Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .test-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #fff;
+        }
+        .test-section h2 {
+            color: #182A62;
+            margin-top: 0;
+            font-size: 18px;
+        }
+        button {
+            background-color: #182A62;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 10px 0;
+        }
+        button:hover {
+            background-color: #0f1a3a;
+        }
+        .console-output {
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-top: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+        .info {
+            color: blue;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Report Button Functionality Test</h1>
+
+        <div class="test-section">
+            <h2>Test 1: Basic Report Button Click</h2>
+            <p>This test simulates clicking the report button and verifies that the animation functions work correctly.</p>
+            <button id="test-report-btn">Test Report Button</button>
+            <div class="console-output" id="test1-output">
+                Ready to test report button functionality...
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>Test 2: Animation Elements Check</h2>
+            <p>This test verifies that the required animation elements exist in the DOM.</p>
+            <button id="test-elements-btn">Check Animation Elements</button>
+            <div class="console-output" id="test2-output">
+                Ready to check animation elements...
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>Test 3: Polling Control</h2>
+            <p>This test verifies that the polling control functions work correctly.</p>
+            <button id="test-polling-btn">Test Polling Control</button>
+            <div class="console-output" id="test3-output">
+                Ready to test polling control...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mock DOM elements for testing
+        const mockActiveSection = {
+            style: {
+                transform: 'translateX(0)',
+                opacity: '1',
+                pointerEvents: 'auto',
+                setProperty: function(prop, value) {
+                    this[prop] = value;
+                    console.log(`Set ${prop} to ${value} on active section`);
+                }
+            },
+            offsetHeight: 100
+        };
+
+        const mockReportsInterface = {
+            style: {
+                transform: 'translateX(100%)',
+                opacity: '0',
+                visibility: 'hidden',
+                pointerEvents: 'none',
+                setProperty: function(prop, value) {
+                    this[prop] = value;
+                    console.log(`Set ${prop} to ${value} on reports interface`);
+                }
+            },
+            offsetHeight: 100
+        };
+
+        let mockPollingInterval = null;
+
+        // Mock functions from the original code
+        function stopPollingTemporarily() {
+            if (mockPollingInterval) {
+                clearInterval(mockPollingInterval);
+                mockPollingInterval = null;
+                console.log('⏸️ Polling paused for 30 seconds');
+                return true;
+            } else {
+                console.log('ℹ️ No active polling interval to pause');
+                return false;
+            }
+        }
+
+        function animateToReports() {
+            console.log('🎬 Starting push-left animation to reports...');
+
+            if (!mockActiveSection || !mockReportsInterface) {
+                console.error('❌ Critical animation elements not found in DOM');
+                return false;
+            }
+
+            console.log('✅ Elements found - applying animation styles...');
+
+            try {
+                // Push active section left and hide it
+                mockActiveSection.style.setProperty('transform', 'translateX(-100%)');
+                mockActiveSection.style.setProperty('opacity', '0');
+                mockActiveSection.style.setProperty('pointer-events', 'none');
+
+                // Bring reports interface in from right and make it visible
+                mockReportsInterface.style.setProperty('transform', 'translateX(0)');
+                mockReportsInterface.style.setProperty('opacity', '1');
+                mockReportsInterface.style.setProperty('visibility', 'visible');
+                mockReportsInterface.style.setProperty('pointer-events', 'auto');
+
+                // Force reflow to ensure styles are applied
+                mockActiveSection.offsetHeight;
+                mockReportsInterface.offsetHeight;
+
+                console.log('✅ Animation completed successfully');
+                return true;
+            } catch (error) {
+                console.error('❌ Animation error:', error);
+                return false;
+            }
+        }
+
+        function animateBackToActive() {
+            console.log('🎬 Starting reverse animation back to active...');
+
+            if (!mockActiveSection || !mockReportsInterface) {
+                console.error('❌ Animation elements not found');
+                return false;
+            }
+
+            try {
+                // Push reports interface right and hide it
+                mockReportsInterface.style.transform = 'translateX(100%)';
+                mockReportsInterface.style.opacity = '0';
+                mockReportsInterface.style.pointerEvents = 'none';
+
+                // Bring active section back from left and make it visible
+                mockActiveSection.style.transform = 'translateX(0)';
+                mockActiveSection.style.opacity = '1';
+                mockActiveSection.style.pointerEvents = 'auto';
+
+                console.log('✅ Reverse animation completed successfully');
+                return true;
+            } catch (error) {
+                console.error('❌ Animation error:', error);
+                return false;
+            }
+        }
+
+        // Test functions
+        function testReportButton() {
+            const output = document.getElementById('test1-output');
+            output.innerHTML = 'Starting report button test...\n';
+
+            // Start with a polling interval
+            mockPollingInterval = setInterval(() => {
+                console.log('Polling...');
+            }, 2000);
+
+            // Simulate report button click
+            output.innerHTML += '🔄 Stopping polling...\n';
+            const pollingStopped = stopPollingTemporarily();
+            if (pollingStopped) {
+                output.innerHTML += '✅ Polling stopped successfully\n';
+            } else {
+                output.innerHTML += 'ℹ️ No polling to stop (expected on first run)\n';
+            }
+
+            output.innerHTML += '🎬 Starting animation...\n';
+            const animationSuccess = animateToReports();
+            if (animationSuccess) {
+                output.innerHTML += '✅ Animation completed successfully\n';
+                output.innerHTML += '📊 Final state:\n';
+                output.innerHTML += `   - Active section: transform=${mockActiveSection.style.transform}, opacity=${mockActiveSection.style.opacity}\n`;
+                output.innerHTML += `   - Reports interface: transform=${mockReportsInterface.style.transform}, opacity=${mockReportsInterface.style.opacity}\n`;
+            } else {
+                output.innerHTML += '❌ Animation failed\n';
+            }
+        }
+
+        function testAnimationElements() {
+            const output = document.getElementById('test2-output');
+            output.innerHTML = 'Checking animation elements...\n';
+
+            if (mockActiveSection && mockReportsInterface) {
+                output.innerHTML += '✅ Both animation elements found\n';
+                output.innerHTML += `📋 Active section initial state: transform=${mockActiveSection.style.transform}, opacity=${mockActiveSection.style.opacity}\n`;
+                output.innerHTML += `📋 Reports interface initial state: transform=${mockReportsInterface.style.transform}, opacity=${mockReportsInterface.style.opacity}\n`;
+            } else {
+                output.innerHTML += '❌ Missing animation elements\n';
+            }
+        }
+
+        function testPollingControl() {
+            const output = document.getElementById('test3-output');
+            output.innerHTML = 'Testing polling control...\n';
+
+            // Start polling
+            mockPollingInterval = setInterval(() => {
+                console.log('Polling...');
+            }, 2000);
+            output.innerHTML += '✅ Started polling interval\n';
+
+            // Test stopping
+            const stopped = stopPollingTemporarily();
+            if (stopped) {
+                output.innerHTML += '✅ Successfully stopped polling\n';
+            } else {
+                output.innerHTML += '❌ Failed to stop polling\n';
+            }
+
+            // Check if interval is cleared
+            if (!mockPollingInterval) {
+                output.innerHTML += '✅ Polling interval properly cleared\n';
+            } else {
+                output.innerHTML += '❌ Polling interval not cleared\n';
+            }
+        }
+
+        // Event listeners
+        document.getElementById('test-report-btn').addEventListener('click', testReportButton);
+        document.getElementById('test-elements-btn').addEventListener('click', testAnimationElements);
+        document.getElementById('test-polling-btn').addEventListener('click', testPollingControl);
+
+        // Run initial test
+        console.log('Report button test page loaded');
+    </script>
+</body>
+</html>

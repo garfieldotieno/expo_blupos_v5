@@ -1,8 +1,17 @@
 import 'package:flutter/material.dart';
-import '../services/activation_service.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import '../services/micro_server_service.dart';
 
 class ActivationPage extends StatefulWidget {
-  const ActivationPage({super.key});
+  final VoidCallback? onActivationSuccess;
+  final bool isReactivation; // true for reactivation (expired state), false for first-time
+
+  const ActivationPage({
+    super.key,
+    this.onActivationSuccess,
+    this.isReactivation = false,
+  });
 
   @override
   State<ActivationPage> createState() => _ActivationPageState();
@@ -11,7 +20,7 @@ class ActivationPage extends StatefulWidget {
 class _ActivationPageState extends State<ActivationPage> {
   final TextEditingController _activationCodeController = TextEditingController();
   final TextEditingController _deviceNameController = TextEditingController();
-  String _statusMessage = 'Enter device name and activation code';
+  String _statusMessage = 'Enter activation code';
   bool _isActivating = false;
   bool _isDiscovering = false;
   String? _deviceUid;
@@ -27,52 +36,29 @@ class _ActivationPageState extends State<ActivationPage> {
   Future<void> _startServerDiscovery() async {
     setState(() {
       _isDiscovering = true;
-      _statusMessage = 'Discovering BluPOS server...';
+      _statusMessage = 'Checking micro-server status...';
     });
 
-    try {
-      final serverUrl = await ActivationService.discoverMasterServer();
-      if (serverUrl != null) {
-        setState(() {
-          _discoveredServer = serverUrl;
-          _statusMessage = 'BluPOS server found at $serverUrl';
-        });
+    // Small delay to simulate checking
+    await Future.delayed(const Duration(seconds: 1));
 
-        // Test connection
-        final connectionTest = await ActivationService.testMasterConnection();
-        if (connectionTest) {
-          setState(() {
-            _statusMessage = 'Connected to BluPOS server. Ready to activate.';
-          });
-        } else {
-          setState(() {
-            _statusMessage = 'Server found but connection failed. Please check network.';
-          });
-        }
-      } else {
-        setState(() {
-          _statusMessage = 'No BluPOS server found. Please ensure BluPOS is running and on the same network.';
-        });
-      }
-    } catch (e) {
+    if (MicroServerService.isRunning) {
       setState(() {
-        _statusMessage = 'Server discovery failed: ${e.toString()}';
+        _discoveredServer = 'localhost:${MicroServerService.PORT}';
+        _statusMessage = 'Micro-server is running. Ready to activate.';
       });
-    } finally {
+    } else {
       setState(() {
-        _isDiscovering = false;
+        _statusMessage = 'Micro-server not running. Please restart the app.';
       });
     }
+
+    setState(() {
+      _isDiscovering = false;
+    });
   }
 
   void _onActivatePressed() async {
-    if (_deviceNameController.text.isEmpty) {
-      setState(() {
-        _statusMessage = 'Please enter device name';
-      });
-      return;
-    }
-
     if (_activationCodeController.text.isEmpty) {
       setState(() {
         _statusMessage = 'Please enter activation code';
@@ -80,9 +66,9 @@ class _ActivationPageState extends State<ActivationPage> {
       return;
     }
 
-    if (_discoveredServer == null) {
+    if (!MicroServerService.isRunning) {
       setState(() {
-        _statusMessage = 'No BluPOS server found. Please ensure BluPOS is running.';
+        _statusMessage = 'Micro-server not running. Please restart the app.';
       });
       return;
     }
@@ -93,64 +79,52 @@ class _ActivationPageState extends State<ActivationPage> {
     });
 
     try {
-      // Step 1: Register device
-      setState(() {
-        _statusMessage = 'Registering device with BluPOS...';
-      });
+      // Generate device ID
+      final deviceId = 'device_${DateTime.now().millisecondsSinceEpoch}';
 
-      final registrationResult = await ActivationService.registerDevice(
-        deviceName: _deviceNameController.text,
+      // Call micro-server activation API
+      final url = Uri.parse('http://localhost:${MicroServerService.PORT}/activate');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'action': 'first_time',
+          'device_id': deviceId,
+          'activation_code': _activationCodeController.text,
+        }),
       );
 
-      if (!registrationResult['success']) {
+      if (response.statusCode != 200) {
         setState(() {
           _isActivating = false;
-          _statusMessage = 'Device registration failed: ${registrationResult['message']}';
+          _statusMessage = 'Server error: ${response.statusCode}';
         });
         return;
       }
 
-      final activationCode = registrationResult['activation_code'];
-      _deviceUid = registrationResult['device_uid'];
+      final result = jsonDecode(response.body);
 
-      // Step 2: Activate device using the provided activation code
-      setState(() {
-        _statusMessage = 'Activating device license...';
-      });
-
-      final activationResult = await ActivationService.activateDevice(
-        activationCode: _activationCodeController.text,
-      );
-
-      if (!activationResult['success']) {
+      if (result['status'] != 'success') {
         setState(() {
           _isActivating = false;
-          _statusMessage = 'Activation failed: ${activationResult['message']}';
+          _statusMessage = 'Activation failed: ${result['message']}';
         });
         return;
-      }
-
-      // Step 3: Update device status
-      if (_deviceUid != null) {
-        await ActivationService.updateDeviceStatus(
-          deviceUid: _deviceUid!,
-          isOnline: true,
-        );
       }
 
       // Success
       setState(() {
         _isActivating = false;
-        _statusMessage = 'Device activated successfully! You can now access Wallet and Reports.';
+        _statusMessage = result['message'];
       });
 
-      // Navigate to wallet after short delay
-      Future.delayed(const Duration(seconds: 2), () {
+      // Call the callback to update app state
+      widget.onActivationSuccess?.call();
+
+      // Navigate back after short delay
+      Future.delayed(const Duration(seconds: 1), () {
         if (mounted) {
-          // This would normally navigate to wallet page
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Activation complete! Switch to Wallet tab.')),
-          );
+          Navigator.of(context).pop();
         }
       });
 
@@ -183,29 +157,44 @@ class _ActivationPageState extends State<ActivationPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Activation',
-          style: TextStyle(color: Colors.black),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            const SizedBox(height: 40),
-            Center(
-              child: Container(
-                width: 280,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              const SizedBox(height: 20), // Conservative spacing from top (matches welcome page)
+
+              // Back Button (pushed up, matches welcome page button style)
+              Container(
+                width: double.infinity,
+                height: 50 * 1.35, // 35% increase from 50px base height (matches welcome page)
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF182A62),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'Back',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 32),
+
+              // Input Field Container (now yellow background, full width to match buttons)
+              Container(
+                width: double.infinity,
                 height: 280,
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: const Color(0xFFFEC620), // Changed to yellow to match theme
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
@@ -218,10 +207,18 @@ class _ActivationPageState extends State<ActivationPage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(
-                      Icons.power_settings_new,
-                      size: 48,
-                      color: Color(0xFF182A62),
+                    Builder(
+                      builder: (context) {
+                        print('🎨 Building activation icon - isReactivation: ${widget.isReactivation}');
+                        final iconColor = widget.isReactivation ? Colors.green.shade600 : const Color(0xFF182A62);
+                        print('🎨 Icon color: $iconColor');
+                        print('🎨 Using Icons.power_settings_new (power button icon)');
+                        return Icon(
+                          Icons.power_settings_new,
+                          size: 48,
+                          color: iconColor,
+                        );
+                      },
                     ),
                     const SizedBox(height: 16),
                     const Text(
@@ -233,17 +230,36 @@ class _ActivationPageState extends State<ActivationPage> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    TextField(
-                      controller: _activationCodeController,
-                      decoration: const InputDecoration(
-                        labelText: 'Activation Code',
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
+                    Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        TextField(
+                          controller: _activationCodeController,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                          ),
+                          textAlign: TextAlign.center,
+                          textAlignVertical: TextAlignVertical.center,
                         ),
-                      ),
-                      textAlign: TextAlign.center,
+                        Positioned(
+                          top: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            color: const Color(0xFFFEC620),
+                            child: const Text(
+                              'Activation Code',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.black54,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     Text(
@@ -257,13 +273,23 @@ class _ActivationPageState extends State<ActivationPage> {
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: 32),
-            Center(
-              child: SizedBox(
-                width: 280,
+
+              const Spacer(), // Pushes button to bottom (matches welcome page)
+
+              // Activate Button (pushed to bottom, matches welcome page button style)
+              Container(
+                width: double.infinity,
+                height: 50 * 1.35, // 35% increase from 50px base height (matches welcome page)
+                margin: const EdgeInsets.only(bottom: 16),
                 child: ElevatedButton(
                   onPressed: _isActivating ? null : _onActivatePressed,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF182A62),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
                   child: _isActivating
                       ? const SizedBox(
                           height: 20,
@@ -273,11 +299,17 @@ class _ActivationPageState extends State<ActivationPage> {
                             valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                           ),
                         )
-                      : const Text('Activate Device'),
+                      : const Text(
+                          'Activate',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

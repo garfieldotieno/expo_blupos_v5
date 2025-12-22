@@ -55,6 +55,10 @@ dependencies:
   provider: ^6.0.5
   intl: ^0.19.0
 
+  # HTTP Server for Micro-Server
+  shelf: ^1.4.1
+  shelf_router: ^1.1.4
+
   # Permissions
   permission_handler: ^11.0.1
 
