@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'pages/activation_page.dart';
-import 'pages/reports_page.dart';
 import 'pages/wallet_page.dart';
 import 'services/micro_server_service.dart';
 
@@ -198,10 +197,372 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _navigateToReports() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => const ReportsPage(),
-      ),
+    // Trigger the transition animation
+    setState(() {
+      _showReportsView = true;
+    });
+  }
+
+  void _navigateToMainView() {
+    // Trigger the reverse transition animation
+    setState(() {
+      _showReportsView = false;
+    });
+  }
+
+  bool _showReportsView = false;
+
+
+
+  // Build the main view with Reports, 4 payments, and Share
+  Widget _buildMainView() {
+    return Column(
+      children: [
+        // Reports Section - Single Button
+        Container(
+          width: double.infinity,
+          height: 50 * 1.35,
+          margin: const EdgeInsets.only(bottom: 16),
+          child: ElevatedButton(
+            onPressed: _navigateToReports,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF182A62),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Reports',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+
+        // Recent Payments Section - Scrollable container for payments
+        Container(
+          constraints: const BoxConstraints(maxHeight: 300), // Max height to prevent overflow
+          margin: const EdgeInsets.only(bottom: 16),
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                // Sample Payment 1
+                Container(
+                  width: double.infinity,
+                  height: 50 * 1.35, // Same height as buttons
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '10:30 AM',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.black.withOpacity(0.6),
+                        ),
+                      ),
+                      Text(
+                        'KES 2,500.00',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Sample Payment 2
+                Container(
+                  width: double.infinity,
+                  height: 50 * 1.35, // Same height as buttons
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '11:45 AM',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.black.withOpacity(0.6),
+                        ),
+                      ),
+                      Text(
+                        'KES 1,200.00',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Sample Payment 3
+                Container(
+                  width: double.infinity,
+                  height: 50 * 1.35, // Same height as buttons
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '2:15 PM',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.black.withOpacity(0.6),
+                        ),
+                      ),
+                      Text(
+                        'KES 3,400.00',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Sample Payment 4
+                Container(
+                  width: double.infinity,
+                  height: 50 * 1.35, // Same height as buttons
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '4:30 PM',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.black.withOpacity(0.6),
+                        ),
+                      ),
+                      Text(
+                        'KES 850.00',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Management Actions - Share button only
+        Container(
+          width: double.infinity,
+          height: 50 * 1.35,
+          margin: const EdgeInsets.only(bottom: 16),
+          child: ElevatedButton(
+            onPressed: () {
+              // TODO: Device sharing functionality
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Share - Device Sharing Coming Soon!')),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF182A62),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Share',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16), // Bottom spacing
+      ],
+    );
+  }
+
+  // Build the reports view with Back, Sales, Items, and Print
+  Widget _buildReportsView() {
+    return Column(
+      children: [
+        // Back Button
+        Container(
+          width: double.infinity,
+          height: 50 * 1.35,
+          margin: const EdgeInsets.only(bottom: 16),
+          child: ElevatedButton(
+            onPressed: _navigateToMainView,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF182A62),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Back',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+
+        // Sales and Items Buttons (2x2 grid)
+        Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          child: Column(
+            children: [
+              // Row 1: Sales Button
+              Container(
+                width: double.infinity,
+                height: 50 * 1.35,
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ElevatedButton(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Sales Reports - Coming Soon!')),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF182A62),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'Sales',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+
+              // Row 2: Items Button
+              Container(
+                width: double.infinity,
+                height: 50 * 1.35,
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ElevatedButton(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Items Reports - Coming Soon!')),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF182A62),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'Items',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Print Button
+        Container(
+          width: double.infinity,
+          height: 50 * 1.35,
+          margin: const EdgeInsets.only(bottom: 16),
+          child: ElevatedButton(
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Print Reports - Coming Soon!')),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF182A62),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Print',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16), // Bottom spacing
+      ],
     );
   }
 
@@ -322,230 +683,22 @@ class _HomePageState extends State<HomePage> {
 
               // Action Sections (for active mode) or Activate Button (for first time)
               if (_appState == AppState.active)
-                // Active Mode: Reports (alone) → Sample Payments → [Activate, Share] group
-                Column(
-                  children: [
-                    // Reports Section - Single Button
-                    Container(
-                      width: double.infinity,
-                      height: 50 * 1.35,
-                      margin: const EdgeInsets.only(bottom: 16),
-                      child: ElevatedButton(
-                        onPressed: () => _navigateToReports(),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF182A62),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: const Text(
-                          'Reports',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // Recent Payments Section - Scrollable container for payments
-                    Container(
-                      constraints: const BoxConstraints(maxHeight: 300), // Max height to prevent overflow
-                      margin: const EdgeInsets.only(bottom: 16),
-                      child: SingleChildScrollView(
-                        child: Column(
-                          children: [
-                            // Sample Payment 1
-                            Container(
-                              width: double.infinity,
-                              height: 50 * 1.35, // Same height as buttons
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              margin: const EdgeInsets.only(bottom: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(8),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    '10:30 AM',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.black.withOpacity(0.6),
-                                    ),
-                                  ),
-                                  Text(
-                                    'KES 2,500.00',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.black,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            // Sample Payment 2
-                            Container(
-                              width: double.infinity,
-                              height: 50 * 1.35, // Same height as buttons
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              margin: const EdgeInsets.only(bottom: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(8),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    '11:45 AM',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.black.withOpacity(0.6),
-                                    ),
-                                  ),
-                                  Text(
-                                    'KES 1,200.00',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.black,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            // Sample Payment 3
-                            Container(
-                              width: double.infinity,
-                              height: 50 * 1.35, // Same height as buttons
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              margin: const EdgeInsets.only(bottom: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(8),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    '2:15 PM',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.black.withOpacity(0.6),
-                                    ),
-                                  ),
-                                  Text(
-                                    'KES 3,400.00',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.black,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            // Sample Payment 4
-                            Container(
-                              width: double.infinity,
-                              height: 50 * 1.35, // Same height as buttons
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              margin: const EdgeInsets.only(bottom: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(8),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    '4:30 PM',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.black.withOpacity(0.6),
-                                    ),
-                                  ),
-                                  Text(
-                                    'KES 850.00',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.black,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // Management Actions - Share button only
-                    Container(
-                      width: double.infinity,
-                      height: 50 * 1.35,
-                      margin: const EdgeInsets.only(bottom: 16),
-                      child: ElevatedButton(
-                        onPressed: () {
-                          // TODO: Device sharing functionality
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Share - Device Sharing Coming Soon!')),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF182A62),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: const Text(
-                          'Share',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16), // Bottom spacing
-                  ],
+                // Active Mode: Animated transition between main view and reports view
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  transitionBuilder: (Widget child, Animation<double> animation) {
+                    // Create slide animation
+                    return SlideTransition(
+                      position: Tween<Offset>(
+                        begin: _showReportsView ? const Offset(-1.0, 0) : const Offset(1.0, 0),
+                        end: Offset.zero,
+                      ).animate(animation),
+                      child: child,
+                    );
+                  },
+                  child: _showReportsView
+                    ? _buildReportsView()
+                    : _buildMainView(),
                 )
               else if (_appState == AppState.firstTime)
                 // First Time: Single Activate button

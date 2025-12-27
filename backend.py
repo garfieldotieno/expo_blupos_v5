@@ -38,6 +38,14 @@ app.config['PERMANENT_SESSION_LIFETIME'] =  timedelta(hours=2)
 def numberFormat(value):
     return format(int(value), 'd')
 
+@app.template_filter()
+def currencyFormat(value):
+    """Format number as currency with commas and 2 decimal places"""
+    try:
+        return "{:,.2f}".format(float(value))
+    except (ValueError, TypeError):
+        return str(value)
+
 
 def load_shop_data():
     json_file = open("shop_config.json")
@@ -59,7 +67,7 @@ def sample_upc_code(stringLength=12):
 
 session_middleware = {
     "Anonymous": {"allowed_routes": ['/', '/about', '/invalid']},
-    "Admin" : {"allowed_routes":['/users', '/records', '/add_user', '/delete_user']},
+    "Admin" : {"allowed_routes":['/users', '/records', '/add_user', '/delete_user', '/get_sale_record_printout']},
     "Sale":{"allowed_routes":['/sales', '/add_sale_record']},
     "Inventory" : {"allowed_routes":['/inventory', '/add_item_inventory', '/edit_item', '/delete_item_inventory', '/delete_item_inventory', '/item/', '/update_item_inventory', '/get_restock_printout', '/get_sale_record_printout', '/get_sale_transaction_printout', '/api/inventory/items', '/api/inventory/transactions', '/api/inventory/sales']}
 }
@@ -860,9 +868,348 @@ def get_restock_printout():
             ))
             return response
 
+@app.route('/get_latest_payments', methods=['GET'])
+def get_latest_payments():
+    """Get latest 4 payment records for APK interface display"""
+    query = is_active()
+    if not (query['status'] and '/get_sale_record_printout' in query['middleware']['allowed_routes']):
+        return jsonify({"status": "error", "payments": []})
+
+    try:
+        # Get latest 4 sales records ordered by creation date
+        latest_payments = SaleRecord.query.order_by(SaleRecord.created_at.desc()).limit(4).all()
+
+        payments_data = []
+        for record in latest_payments:
+            payments_data.append({
+                "transaction_id": record.uid,
+                "sales_person": record.sale_clerk,
+                "amount": "{:.2f}".format(record.sale_paid_amount),
+                "balance": "{:.2f}".format(record.sale_balance),
+                "payment_type": record.payment_method or "Cash",
+                "datetime": record.created_at.strftime('%Y-%m-%d %H:%M'),
+                "checkout_id": str(record.id)
+            })
+
+        return jsonify({
+            "status": "success",
+            "payments": payments_data
+        })
+    except Exception as e:
+        print(f"Error fetching latest payments: {e}")
+        return jsonify({"status": "error", "payments": []})
+
+@app.route('/get_total_sales', methods=['GET'])
+def get_total_sales():
+    """Get real-time total sales amount (paid minus change) for yellow card display"""
+    query = is_active()
+    if not (query['status'] and '/get_sale_record_printout' in query['middleware']['allowed_routes']):
+        return jsonify({"status": "error", "total_sales": "0.00"})
+
+    try:
+        # Calculate total sales: sum of all paid amounts minus sum of all balances/changes
+        total_paid = db.session.query(db.func.sum(SaleRecord.sale_paid_amount)).scalar() or 0.0
+        total_balance = db.session.query(db.func.sum(SaleRecord.sale_balance)).scalar() or 0.0
+
+        # Net sales = total paid - total change/balance (what was actually kept by business)
+        net_sales = total_paid - total_balance
+
+        return jsonify({
+            "status": "success",
+            "total_sales": "{:.2f}".format(net_sales)
+        })
+    except Exception as e:
+        print(f"Error calculating total sales: {e}")
+        return jsonify({"status": "error", "total_sales": "0.00"})
+
+@app.route('/get_items_report', methods=['GET'])
+def get_items_report():
+    """Get comprehensive items report for APK interface display"""
+    query = is_active()
+    if not (query['status'] and '/get_sale_record_printout' in query['middleware']['allowed_routes']):
+        return redirect(query['middleware']['allowed_routes'][0])
+
+    try:
+        # Check if request wants HTML for iframe display
+        if request.args.get('format') == 'html':
+            # Get all items with stock information
+            items = SaleItem.query.all()
+            stock_data = {}
+            for stock in SaleItemStockCount.query.all():
+                stock_data[stock.item_uid] = stock
+
+            # Calculate sales data per item
+            sales_data = {}
+            transactions = SaleItemTransaction.query.all()
+            for transaction in transactions:
+                uid = transaction.item_uid
+                if uid not in sales_data:
+                    sales_data[uid] = 0
+                sales_data[uid] += transaction.transaction_quantity
+
+            # Build items report
+            items_report = []
+            total_value = 0
+            total_items = 0
+            low_stock_count = 0
+
+            for item in items:
+                stock = stock_data.get(item.uid)
+                units_sold = sales_data.get(item.uid, 0)
+                current_stock = stock.current_stock_count if stock else 0
+                restock_value = stock.re_stock_value if stock else 0
+                item_value = current_stock * item.price
+
+                total_value += item_value
+                total_items += 1
+                if current_stock < restock_value:
+                    low_stock_count += 1
+
+                items_report.append({
+                    "name": item.name,
+                    "upc_code": item.uid,
+                    "current_stock": current_stock,
+                    "restock_value": restock_value,
+                    "price": float(item.price),
+                    "item_value": float(item_value),
+                    "units_sold": units_sold,
+                    "item_type": item.item_type,
+                    "low_stock": current_stock < restock_value
+                })
+
+            # Sales summary by clerk
+            clerk_sales = {}
+            for record in SaleRecord.query.all():
+                clerk = record.sale_clerk
+                if clerk not in clerk_sales:
+                    clerk_sales[clerk] = {"transactions": 0, "total_sales": 0.0}
+                clerk_sales[clerk]["transactions"] += 1
+                clerk_sales[clerk]["total_sales"] += record.sale_total
+
+            shop_data = load_shop_data()
+            user_name = user_from_session()
+
+            response = make_response(render_template(
+                'items_report_html.html',
+                is_active=True,
+                title="Items Report",
+                flash_message=False,
+                flash_payload="",
+                user_type=query['middleware'],
+                user_name=user_name,
+                shop_data=[shop_data],
+                items=items_report[:500],  # Limit to 500 items for display
+                summary={
+                    "total_items": total_items,
+                    "total_value": float(total_value),
+                    "low_stock_count": low_stock_count,
+                    "clerk_sales": clerk_sales
+                },
+                datetime=datetime
+            ))
+            return response
+
+        # Generate PDF directly in landscape A4 format
+        # Get all items with stock information
+        items = SaleItem.query.all()
+        stock_data = {}
+        for stock in SaleItemStockCount.query.all():
+            stock_data[stock.item_uid] = stock
+
+        # Calculate sales data per item
+        sales_data = {}
+        transactions = SaleItemTransaction.query.all()
+        for transaction in transactions:
+            uid = transaction.item_uid
+            if uid not in sales_data:
+                sales_data[uid] = 0
+            sales_data[uid] += transaction.transaction_quantity
+
+        # Build items report
+        items_report = []
+        total_value = 0
+        total_items = 0
+        low_stock_count = 0
+
+        for item in items:
+            stock = stock_data.get(item.uid)
+            units_sold = sales_data.get(item.uid, 0)
+            current_stock = stock.current_stock_count if stock else 0
+            restock_value = stock.re_stock_value if stock else 0
+            item_value = current_stock * item.price
+
+            total_value += item_value
+            total_items += 1
+            if current_stock < restock_value:
+                low_stock_count += 1
+
+            items_report.append({
+                "name": item.name,
+                "upc_code": item.uid,
+                "current_stock": current_stock,
+                "restock_value": restock_value,
+                "price": float(item.price),
+                "item_value": float(item_value),
+                "units_sold": units_sold,
+                "item_type": item.item_type,
+                "low_stock": current_stock < restock_value
+            })
+
+        # Sales summary by clerk
+        clerk_sales = {}
+        for record in SaleRecord.query.all():
+            clerk = record.sale_clerk
+            if clerk not in clerk_sales:
+                clerk_sales[clerk] = {"transactions": 0, "total_sales": 0.0}
+            clerk_sales[clerk]["transactions"] += 1
+            clerk_sales[clerk]["total_sales"] += record.sale_total
+
+        shop_data = load_shop_data()
+        user_name = user_from_session()
+
+        # Create PDF buffer for landscape A4
+        pdf_buffer = BytesIO()
+
+        # Landscape A4 format
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+        from reportlab.lib import colors
+        from reportlab.lib.units import inch
+
+        doc = SimpleDocTemplate(pdf_buffer, pagesize=landscape(A4),
+                               leftMargin=0.5*inch, rightMargin=0.5*inch,
+                               topMargin=0.5*inch, bottomMargin=0.5*inch)
+        styles = getSampleStyleSheet()
+
+        # Custom styles for items report
+        title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=16, alignment=1, spaceAfter=20)
+        subtitle_style = ParagraphStyle('Subtitle', parent=styles['Heading2'], fontSize=14, alignment=1, spaceAfter=15)
+        normal_style = ParagraphStyle('Normal', parent=styles['Normal'], fontSize=10, leading=12)
+        center_style = ParagraphStyle('Center', parent=styles['Normal'], fontSize=10, alignment=1, spaceAfter=10)
+
+        story = []
+
+        # Header
+        story.append(Paragraph(shop_data['pos_shop_name'], title_style))
+        story.append(Paragraph(f"Address: {shop_data['shop_adress']} | Tel: {shop_data['pos_shop_call_number']}", center_style))
+        story.append(Paragraph("ITEMS INVENTORY REPORT", subtitle_style))
+        story.append(Paragraph(f"Generated by: {user_name['user_name']} | Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", center_style))
+        story.append(Spacer(1, 20))
+
+        # Inventory Summary
+        story.append(Paragraph("INVENTORY SUMMARY", subtitle_style))
+
+        # Format numbers with commas and decimals
+        def format_currency(amount):
+            return f"KES {amount:,.2f}"
+
+        # Summary table
+        summary_data = [
+            ['Total Items', 'Total Inventory Value', 'Low Stock Items', 'Items Sold Today'],
+            [str(total_items), format_currency(total_value), str(low_stock_count), str(sum(item['units_sold'] for item in items_report))]
+        ]
+
+        summary_table = Table(summary_data, colWidths=[2*inch, 2*inch, 2*inch, 2*inch])
+        summary_table.setStyle(TableStyle([
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('FONTNAME', (0, 0), (-1, 0), 'Courier-Bold'),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('LEFTPADDING', (0, 0), (-1, -1), 5),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ]))
+        story.append(summary_table)
+        story.append(Spacer(1, 15))
+
+        # Sales by clerk summary
+        if clerk_sales:
+            story.append(Paragraph("SALES SUMMARY BY CLERK", styles['Heading3']))
+            clerk_data = [['Clerk Name', 'Total Transactions', 'Total Sales Amount']]
+            for clerk, data in clerk_sales.items():
+                clerk_data.append([clerk, str(data['transactions']), format_currency(data['total_sales'])])
+
+            clerk_table = Table(clerk_data, colWidths=[2.5*inch, 2*inch, 2*inch])
+            clerk_table.setStyle(TableStyle([
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('FONTNAME', (0, 0), (-1, 0), 'Courier-Bold'),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('LEFTPADDING', (0, 0), (-1, -1), 3),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 3),
+                ('TOPPADDING', (0, 0), (-1, -1), 3),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ]))
+            story.append(clerk_table)
+            story.append(Spacer(1, 20))
+
+        # Page break before detailed items
+        story.append(PageBreak())
+
+        # Detailed Items
+        story.append(Paragraph("DETAILED ITEMS INVENTORY", subtitle_style))
+
+        # Items table header
+        items_data = [['Item Name', 'UPC Code', 'Current Stock', 'Restock Level', 'Unit Price', 'Inventory Value', 'Units Sold', 'Item Type']]
+
+        # Add items (limit to avoid huge PDF)
+        for item in items_report[:500]:  # Limit to 500 items to keep PDF manageable
+            items_data.append([
+                item['name'][:25] + '...' if len(item['name']) > 25 else item['name'],  # Truncate long names
+                item['upc_code'],
+                str(item['current_stock']),
+                str(item['restock_value']),
+                format_currency(item['price']),
+                format_currency(item['item_value']),
+                str(item['units_sold']),
+                item['item_type']
+            ])
+
+        # Create table with multiple rows per page
+        items_table = Table(items_data, colWidths=[1.5*inch, 1.2*inch, 0.8*inch, 0.8*inch, 1*inch, 1.2*inch, 0.8*inch, 1*inch])
+        items_table.setStyle(TableStyle([
+            ('FONTSIZE', (0, 0), (-1, -1), 7),
+            ('FONTNAME', (0, 0), (-1, 0), 'Courier-Bold'),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ('LEFTPADDING', (0, 0), (-1, -1), 2),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 2),
+            ('TOPPADDING', (0, 0), (-1, -1), 2),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+        ]))
+        story.append(items_table)
+
+        if len(items_report) > 500:
+            story.append(Spacer(1, 10))
+            story.append(Paragraph(f"* Showing first 500 of {len(items_report)} total items", center_style))
+
+        # Build PDF
+        doc.build(story)
+        pdf_buffer.seek(0)
+
+        print("Items inventory PDF generated successfully")
+
+        # Return as download that opens in print dialog
+        response = make_response(pdf_buffer.read())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = 'inline; filename=items_inventory_report.pdf'
+        return response
+
+    except Exception as e:
+        print(f"Error generating items report: {e}")
+        if request.args.get('format') == 'html':
+            return jsonify({"status": "error", "message": "Failed to generate items report"})
+        return redirect(query['middleware']['allowed_routes'][0])
+
 @app.route('/get_sale_record_printout', methods=['GET'])
 def get_sale_record_printout():
-    # Generate PDF directly in landscape A4 format with fiscal summary
+    # Common authentication and date parsing for both HTML and PDF formats
     query = is_active()
     if not (query['status'] and '/get_sale_record_printout' in query['middleware']['allowed_routes']):
         return redirect(query['middleware']['allowed_routes'][0])
@@ -890,9 +1237,60 @@ def get_sale_record_printout():
         sale_records = SaleRecord.query.filter(
             SaleRecord.created_at >= start_date,
             SaleRecord.created_at <= end_date
-        ).all()
+        ).order_by(SaleRecord.created_at.desc()).all()  # Latest first
     else:
-        sale_records = SaleRecord.query.all()
+        sale_records = SaleRecord.query.order_by(SaleRecord.created_at.desc()).all()  # Latest first
+
+    shop_data = load_shop_data()
+    user_name = user_from_session()
+
+    # Check if request wants HTML for iframe display
+    if request.args.get('format') == 'html':
+        # Calculate fiscal summary for HTML display
+        if sale_records:
+            total_sales = sum(record.sale_total for record in sale_records)
+            total_paid = sum(record.sale_paid_amount for record in sale_records)
+            total_balance = sum(record.sale_balance for record in sale_records)
+            total_transactions = len(sale_records)
+
+            # Payment method breakdown
+            payment_methods = {}
+            for record in sale_records:
+                method = record.payment_method or 'Cash'
+                if method not in payment_methods:
+                    payment_methods[method] = {'count': 0, 'amount': 0}
+                payment_methods[method]['count'] += 1
+                payment_methods[method]['amount'] += record.sale_total
+        else:
+            total_sales = total_paid = total_balance = total_transactions = 0
+            payment_methods = {}
+
+        # Limit records for display (same as PDF limit)
+        display_records = sale_records[:500] if sale_records else []
+
+        response = make_response(render_template(
+            'sales_records_html.html',
+            is_active=True,
+            title="Sales Records Report",
+            flash_message=False,
+            flash_payload="",
+            user_type=query['middleware'],
+            user_name=user_name,
+            shop_data=[shop_data],
+            sale_records=display_records,
+            total_sales=total_sales,
+            total_paid=total_paid,
+            total_balance=total_balance,
+            total_transactions=total_transactions,
+            payment_methods=payment_methods,
+            start_date=start_date,
+            end_date=end_date,
+            datetime=datetime
+        ))
+        return response
+
+    # Generate PDF directly in landscape A4 format with fiscal summary
+    # (sale_records already fetched above with proper ordering)
 
     shop_data = load_shop_data()
     user_name = user_from_session()
@@ -1157,81 +1555,124 @@ def fetch_item_if_sale(uid):
 
 @app.route('/add_sale_record', methods=['POST'])
 def add_clerk_sale_record():
-    # fetch post with security key
-    json_data = request.get_json()
-    print(f"recieved sale record, {json_data}")
-    items_sold = []
-    item_array = json_data['items_array']
-    print(f"item_arr is ot type {type(item_array)}")
+    try:
+        # fetch post with security key
+        json_data = request.get_json()
+        print(f"received sale record, {json_data}")
+        items_sold = []
+        item_array = json_data['items_array']
+        print(f"item_arr is of type {type(item_array)}")
 
-    # create sale record first to get the sale_id
-    sale_record = SaleRecord()
-    sale_record.uid = randomString(10)
-    sale_record.sale_clerk = json_data['sale_clerk']
-    sale_record.sale_total = json_data['sale_total']
-    sale_record.sale_paid_amount = json_data['sale_paid_amount']
-    sale_record.sale_balance = json_data['sale_balance']
-    sale_record.payment_method = json_data.get('payment_method')
-    sale_record.payment_reference = json_data.get('payment_reference')
-    sale_record.payment_gateway = json_data.get('payment_gateway')
-    db.session.add(sale_record)
-    db.session.commit()
+        # Validate required fields
+        required_fields = ['sale_clerk', 'sale_total', 'sale_paid_amount', 'sale_balance', 'items_array']
+        for field in required_fields:
+            if field not in json_data:
+                return jsonify({'status': False, 'error': f'Missing required field: {field}'})
 
-    # sale item transactions linked to the sale
-    for it in item_array:
-        print("adding sale-item-transactions---")
+        # Check stock availability BEFORE creating any records
+        stock_check_passed = True
+        insufficient_items = []
 
-        item_transaction = SaleItemTransaction()
-        sale_item = SaleItem.query.filter_by(id=int(it.split(":")[0])).first()
-        print(f"found sale item {sale_item}")
-        if sale_item is None:
-            print(f"Item with ID {int(it.split(':')[0])} not found. Available items:")
-            all_items = SaleItem.query.all()
-            for item in all_items:
-                print(f"  ID: {item.id}, Name: {item.name}, UID: {item.uid}")
-            continue
+        for it in item_array:
+            try:
+                item_id = int(it.split(":")[0])
+                sale_item = SaleItem.query.filter_by(id=item_id).first()
+                if sale_item is None:
+                    print(f"Item with ID {item_id} not found")
+                    insufficient_items.append(f"Item ID {item_id} not found")
+                    stock_check_passed = False
+                    continue
 
-        item_transaction.sale_id = sale_record.id
-        item_transaction.item_uid = sale_item.uid
-        item_transaction.transaction_type = 'Purchase'
-        item_transaction.transaction_quantity = 1
-        item_transaction.item_price = sale_item.price
-        db.session.add(item_transaction)
+                stock = SaleItemStockCount.query.filter_by(item_uid=sale_item.uid).first()
+                if stock is None or stock.current_stock_count < 1:
+                    print(f"Insufficient stock for item {sale_item.name}: current_stock_count={stock.current_stock_count if stock else 'N/A'}")
+                    insufficient_items.append(sale_item.name)
+                    stock_check_passed = False
+            except (ValueError, IndexError) as e:
+                print(f"Invalid item format: {it}, error: {e}")
+                insufficient_items.append(f"Invalid item: {it}")
+                stock_check_passed = False
+
+        # If stock check failed, return error without creating any records
+        if not stock_check_passed:
+            if len(insufficient_items) == 1:
+                error_msg = f"Item not in stock: {insufficient_items[0]}"
+            else:
+                error_msg = f"Items not in stock: {', '.join(insufficient_items)}"
+            print(f"Stock check failed: {error_msg}")
+            return jsonify({'status': False, 'error': error_msg})
+
+        # All stock checks passed, now create the records
+        print("Stock check passed, creating sale record...")
+
+        # create sale record first to get the sale_id
+        sale_record = SaleRecord()
+        sale_record.uid = randomString(10)
+        sale_record.sale_clerk = json_data['sale_clerk']
+        sale_record.sale_total = json_data['sale_total']
+        sale_record.sale_paid_amount = json_data['sale_paid_amount']
+        sale_record.sale_balance = json_data['sale_balance']
+        sale_record.payment_method = json_data.get('payment_method')
+        sale_record.payment_reference = json_data.get('payment_reference')
+        sale_record.payment_gateway = json_data.get('payment_gateway')
+        db.session.add(sale_record)
         db.session.commit()
+        print(f"Sale record created: {sale_record.uid}")
 
-    # Check stock availability before updating
-    for it in item_array:
-        sale_item = SaleItem.query.filter_by(id=int(it.split(":")[0])).first()
-        if sale_item is None:
-            print(f"Item with ID {int(it.split(':')[0])} not found during stock check")
-            continue
+        # sale item transactions linked to the sale
+        for it in item_array:
+            print("adding sale-item-transactions---")
+            try:
+                item_id = int(it.split(":")[0])
+                sale_item = SaleItem.query.filter_by(id=item_id).first()
+                if sale_item is None:
+                    print(f"Item with ID {item_id} not found during transaction creation")
+                    continue
 
-        stock = SaleItemStockCount.query.filter_by(item_uid=sale_item.uid).first()
-        if stock is None or stock.current_stock_count < 1:
-            print(f"Insufficient stock for item {sale_item.name}: current_stock_count={stock.current_stock_count if stock else 'N/A'}")
-            # Rollback the transaction
-            db.session.rollback()
-            return {'status': False, 'error': f'Insufficient stock for {sale_item.name}'}
+                item_transaction = SaleItemTransaction()
+                item_transaction.sale_id = sale_record.id
+                item_transaction.item_uid = sale_item.uid
+                item_transaction.transaction_type = 'Purchase'
+                item_transaction.transaction_quantity = 1
+                item_transaction.item_price = sale_item.price
+                db.session.add(item_transaction)
+                print(f"Transaction created for item: {sale_item.name}")
+            except Exception as e:
+                print(f"Error creating transaction for item {it}: {e}")
+                continue
 
-    # update stock count only if all items have sufficient stock
-    for it in item_array:
-        print("updating item stock count---")
-        sale_item = SaleItem.query.filter_by(id=int(it.split(":")[0])).first()
-        print(f"found sale during stock update item {sale_item}")
-        if sale_item is None:
-            print(f"Item with ID {int(it.split(':')[0])} not found during stock update")
-            continue
+        db.session.commit()
+        print("All transactions committed")
 
-        stock = SaleItemStockCount.query.filter_by(item_uid=sale_item.uid).first()
-        print(f"found stock {stock}")
+        # update stock count now that everything is confirmed
+        for it in item_array:
+            try:
+                item_id = int(it.split(":")[0])
+                sale_item = SaleItem.query.filter_by(id=item_id).first()
+                if sale_item is None:
+                    print(f"Item with ID {item_id} not found during stock update")
+                    continue
 
-        stock.current_stock_count -= 1
+                stock = SaleItemStockCount.query.filter_by(item_uid=sale_item.uid).first()
+                if stock:
+                    stock.current_stock_count -= 1
+                    # Update re_stock_status
+                    stock.re_stock_status = stock.current_stock_count < stock.re_stock_value
+                    db.session.add(stock)
+                    print(f"Stock updated for {sale_item.name}: {stock.current_stock_count} remaining")
+            except Exception as e:
+                print(f"Error updating stock for item {it}: {e}")
+                continue
 
-        db.session.add(stock)
+        db.session.commit()
+        print("Stock updates committed successfully")
 
-    db.session.commit()
+        return jsonify({'status': True, 'sale_record': {'id': sale_record.id, 'uid': sale_record.uid}})
 
-    return {'status': True, 'sale_record': {'id': sale_record.id, 'uid': sale_record.uid}}
+    except Exception as e:
+        print(f"Unexpected error in add_sale_record: {e}")
+        db.session.rollback()
+        return jsonify({'status': False, 'error': f'Internal server error: {str(e)}'})
 
 
 
@@ -1816,6 +2257,64 @@ def health_check():
         "version": __version__
     })
 
+@app.route('/generate_license_qr', methods=['POST'])
+def generate_license_qr():
+    """Generate QR code for license activation"""
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({"status": "error", "message": "No data provided"}), 400
+
+        license_days = data.get('license_days')
+        device_id = data.get('device_id')
+
+        if not license_days or not device_id:
+            return jsonify({"status": "error", "message": "Missing license_days or device_id"}), 400
+
+        # Validate license days
+        if license_days not in [183, 366]:
+            return jsonify({"status": "error", "message": "Invalid license duration. Must be 183 or 366 days"}), 400
+
+        # Generate unique license type based on duration
+        if license_days == 183:
+            # Generate new 183-day license type
+            license_type = f"BLU{randomString(4).upper()}"
+        else:  # 366 days
+            # Generate new 366-day license type
+            license_type = f"POS{randomString(4).upper()}"
+
+        # Generate unique license key (license type only, no device ID)
+        license_key = license_type
+
+        # Generate QR code data (without device ID for cleaner license key display)
+        qr_data = f"BluPOS License Activation\nLicense Type: {license_type}\nDuration: {license_days} days\nLicense Key: {license_key}\nGenerated: {datetime.now().isoformat()}"
+
+        # Generate QR code
+        qr = qrcode.QRCode(version=1, box_size=10, border=4)
+        qr.add_data(qr_data)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+
+        # Convert to base64
+        buffer = BytesIO()
+        img.save(buffer, format='PNG')
+        buffer.seek(0)
+        qr_base64 = base64.b64encode(buffer.read()).decode('utf-8')
+        qr_data_url = f"data:image/png;base64,{qr_base64}"
+
+        return jsonify({
+            "status": "success",
+            "license_type": license_type,
+            "license_days": license_days,
+            "license_key": license_key,
+            "qr_code": qr_data_url
+        })
+
+    except Exception as e:
+        print(f"License QR generation error: {e}")
+        return jsonify({"status": "error", "message": "Failed to generate license QR code"}), 500
+
 @app.route('/activate', methods=['POST'])
 def device_activation():
     """Device activation and license management endpoint"""
@@ -1838,7 +2337,7 @@ def device_activation():
                 # Update last seen for polling
                 existing_device.last_seen = datetime.now()
                 db.session.commit()
-                print(f"� Checking device: {device_id}")
+                print(f" Checking device: {device_id}")
             else:
                 # No device exists yet, return first_time state
                 return jsonify({
@@ -1870,9 +2369,12 @@ def device_activation():
             if not activation_code:
                 return jsonify({"status": "error", "message": "Missing activation_code"}), 400
 
-            # Validate activation code
+            # Validate activation code - allow standard codes or generated license keys
             valid_codes = ['BLUPOS2025', 'DEMO2025']
-            if activation_code not in valid_codes:
+            is_standard_code = activation_code in valid_codes
+            is_generated_key = len(activation_code) == 7 and activation_code.startswith('POS') and activation_code.isalpha() and activation_code.isupper()  # Generated keys are "POS" + 4 uppercase letters
+
+            if not is_standard_code and not is_generated_key:
                 return jsonify({"status": "error", "message": "Invalid activation code"}), 400
 
             # Check if device already activated (one license per device)
@@ -1881,12 +2383,18 @@ def device_activation():
                 return jsonify({"status": "error", "message": "Device already activated"}), 400
 
             # Determine license type and duration - ENFORCED: Only 2 license types
+            # Check if activation code is one of the standard codes
             if activation_code == 'BLUPOS2025':
                 license_type = 'BLUPOS2025'
                 license_days = 366  # 1 year
-            else:  # DEMO2025
+            elif activation_code == 'DEMO2025':
                 license_type = 'DEMO2025'
                 license_days = 183  # 6 months
+            else:
+                # Check if it's a generated license key (from QR code generation)
+                # For generated keys, we use them directly as license keys
+                license_type = activation_code  # Use the generated key as license type
+                license_days = 366  # Default to 1 year for generated keys
 
             # Create new license
             expiry_date = datetime.now() + timedelta(days=license_days)
@@ -2029,6 +2537,155 @@ def device_activation():
 
     except Exception as e:
         print(f"Activation error: {e}")
+        return jsonify({"status": "error", "message": "Internal server error"}), 500
+
+@app.route('/apk_connection_status', methods=['GET'])
+def apk_connection_status():
+    """Check APK connection status based on heartbeat signals"""
+    try:
+        # Get device_id from query parameter or use current device
+        device_id = request.args.get('device_id')
+
+        if not device_id:
+            # Try to get from current device context
+            device_id = request.args.get('current_device_id')
+
+        if not device_id:
+            # Get the most recently active device
+            device = Device.query.order_by(Device.last_seen.desc()).first()
+            if device:
+                device_id = device.device_id
+            else:
+                return jsonify({
+                    "status": "success",
+                    "connected": False,
+                    "message": "No device found",
+                    "last_seen": None
+                })
+
+        # Check if device exists
+        device = Device.query.filter_by(device_id=device_id).first()
+        if not device:
+            return jsonify({
+                "status": "error",
+                "message": "Device not found"
+            }), 404
+
+        # Check connection status based on last_seen timestamp
+        now = datetime.now(timezone.utc)
+        last_seen = device.last_seen.replace(tzinfo=timezone.utc) if device.last_seen else None
+
+        if not last_seen:
+            connected = False
+            last_seen_str = None
+        else:
+            # Consider connected if heartbeat received within last 60 seconds
+            time_diff = (now - last_seen).total_seconds()
+            connected = time_diff < 60  # 60 seconds timeout
+            last_seen_str = last_seen.isoformat()
+
+        return jsonify({
+            "status": "success",
+            "connected": connected,
+            "device_id": device_id,
+            "last_seen": last_seen_str,
+            "time_diff_seconds": (now - last_seen).total_seconds() if last_seen else None
+        })
+
+    except Exception as e:
+        print(f"APK connection status error: {e}")
+        return jsonify({"status": "error", "message": "Internal server error"}), 500
+
+@app.route('/heartbeat', methods=['POST'])
+def apk_heartbeat():
+    """Receive heartbeat signals from APK"""
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({"status": "error", "message": "No data provided"}), 400
+
+        device_id = data.get('device_id')
+        license_key = data.get('license_key')
+        timestamp = data.get('timestamp')
+        battery_level = data.get('battery_level', 0)
+        network_type = data.get('network_type', 'unknown')
+
+        if not device_id:
+            return jsonify({"status": "error", "message": "Missing device_id"}), 400
+
+        # Update device last_seen timestamp
+        device = Device.query.filter_by(device_id=device_id).first()
+        if device:
+            device.last_seen = datetime.now()
+            db.session.commit()
+
+            # Log heartbeat details
+            print(f"📡 Heartbeat received from device {device_id}: battery={battery_level}%, network={network_type}")
+
+            return jsonify({
+                "status": "success",
+                "server_time": datetime.now().isoformat(),
+                "message": "Heartbeat acknowledged",
+                "commands": []  # Future use for remote commands
+            })
+        else:
+            return jsonify({"status": "error", "message": "Device not found"}), 404
+
+    except Exception as e:
+        print(f"Heartbeat error: {e}")
+        return jsonify({"status": "error", "message": "Internal server error"}), 500
+
+@app.route('/validate_license', methods=['POST'])
+def validate_license():
+    """Validate license key for APK activation"""
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({"status": "error", "message": "No data provided"}), 400
+
+        license_key = data.get('license_key')
+        device_id = data.get('device_id')
+        device_info = data.get('device_info', {})
+
+        if not license_key or not device_id:
+            return jsonify({"status": "error", "message": "Missing license_key or device_id"}), 400
+
+        # Find device
+        device = Device.query.filter_by(device_id=device_id).first()
+        if not device:
+            return jsonify({"status": "error", "message": "Device not found"}), 404
+
+        # Find license for this device
+        license = License.query.filter_by(device_id=device_id).first()
+        if not license:
+            return jsonify({"status": "error", "message": "No license found for device"}), 404
+
+        # Check if license key matches
+        expected_key = license.license_key
+        if license_key != expected_key:
+            return jsonify({"status": "error", "message": "Invalid license key"}), 400
+
+        # Check if license is active and not expired
+        now = datetime.now()
+        if not license.license_status or license.license_expiry <= now:
+            return jsonify({"status": "error", "message": "License expired or inactive"}), 400
+
+        # Calculate days remaining
+        days_remaining = (license.license_expiry - now).days
+
+        return jsonify({
+            "status": "success",
+            "license_type": license.license_type,
+            "valid_until": license.license_expiry.isoformat(),
+            "days_remaining": days_remaining,
+            "features": ["payments", "reports", "sync"],
+            "message": "License validated successfully"
+        })
+
+    except Exception as e:
+        print(f"License validation error: {e}")
         return jsonify({"status": "error", "message": "Internal server error"}), 500
 
 @app.route('/test', methods=['POST'])

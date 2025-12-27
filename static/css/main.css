@@ -401,3 +401,25 @@ input {
   margin: 0 15px;
   padding: 0.5em 0;
 }
+
+/* APK Connection Status Styling */
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(255, 193, 7, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 193, 7, 0);
+  }
+}
+
+#connection-dot {
+  transition: background-color 0.3s ease, animation 0.3s ease;
+}
+
+#connection-text {
+  transition: color 0.3s ease;
+  font-weight: 500;
+}

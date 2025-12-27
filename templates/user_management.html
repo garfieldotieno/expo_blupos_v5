@@ -3,7 +3,7 @@
 {% block content %}
 <br>
 <!-- Payments Interface Master Section - Outside .container for true 95% screen width -->
-<div id="payments-interface-container" style="width: 95%; margin-left: auto; margin-right: auto; margin-top: 48px; background-color: #D7D7D7; border-radius: 15px; padding: 16px;">
+<div id="payments-interface-container" style="background-color: #D7D7D7; border-radius: 15px; height: 2000px;">
     <p class="spacer" style="height: 12px;">
 
     </p>
@@ -11,8 +11,8 @@
 
     <div class="row" style="margin-left: 2%; margin-right: 2%;">
         <!-- APK Interface Replication - Restore 1:3 ratio -->
-        <div class="col-4" style="padding: 8px;">
-            <div style="background-color: #FEC620; min-height: 300px; padding: 16px; border-radius: 8px; position: relative; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+        <div class="col-4" style="padding: 8px; height: 100%;">
+            <div style="background-color: #FEC620; min-height: 300px; padding: 16px; border-radius: 8px; position: relative; box-shadow: 0 4px 8px rgba(0,0,0,0.1); height: 100%;">
                 <!-- Device ID - Top Left -->
                 <div id="device-id-display" style="position: absolute; top: 16px; left: 16px; color: #333; font-size: 10px; font-weight: bold;">
                     --
@@ -53,28 +53,35 @@
 
             </div>
 
-            <!-- Activation Button - Visual Only (No Actions) - Immediately after yellow card -->
+            <!-- Activation Button - Shows System Info Panel in first-time state -->
             <div id="activation-button-container" style="margin-top: 16px;">
-                <button id="apk-activate-btn" style="background-color: #182A62; color: white; border: none; padding: 29px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; width: 100%; cursor: default;" disabled>
+                <button id="apk-activate-btn" style="background-color: #182A62; color: white; border: none; padding: 29px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; width: 100%; cursor: pointer;" onclick="console.log('🎯 ACTIVATE BUTTON PRESSED'); showSystemInfoPanel()">
                     Activate Device
                 </button>
             </div>
 
             <!-- Reactivate Button - For Expired State - Immediately after yellow card -->
             <div id="reactivate-button-container" style="margin-top: 16px; display: none;">
-                <button id="reactivate-btn" style="background-color: #28a745; color: white; border: none; padding: 29px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; width: 100%; cursor: pointer;">
+                <button id="reactivate-btn" style="background-color: #28a745; color: white; border: none; padding: 29px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; width: 100%; cursor: pointer;" onclick="console.log('🔄 REACTIVATE BUTTON PRESSED'); showSystemInfoPanel()">
                     Reactivate License
                 </button>
             </div>
 
             <!-- State Sections Container - For Smooth Transitions -->
-            <div id="state-sections-container" style="margin-top: 16px; position: relative; overflow: visible; min-height: 600px;">
+            <div id="state-sections-container" style="margin-top: 16px; position: relative; overflow: visible; min-height: 600px; height: auto;">
                 <!-- Active State Section -->
                 <div id="active-state-section" style="position: absolute; width: 100%; transition: transform 0.3s ease-in-out;">
                     <!-- Report Button -->
                     <div style="text-align: center; margin-bottom: 8px;">
                         <button id="report-btn" style="background-color: #182A62; color: white; border: none; padding: 29px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; width: 100%; cursor: pointer;">
                             Report
+                        </button>
+                    </div>
+
+                    <!-- User Management Button -->
+                    <div style="text-align: center; margin-bottom: 8px;">
+                        <button id="user-btn" style="background-color: #182A62; color: white; border: none; padding: 29px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; width: 100%; cursor: pointer;">
+                            User Management
                         </button>
                     </div>
 
@@ -123,14 +130,11 @@
                             <div style="margin-bottom: 16px;">
                                 <div style="margin-bottom: 8px; font-weight: bold; color: #333; font-size: 14px;">Reports:</div>
                                 <div style="display: flex; flex-direction: column; gap: 8px;">
-                                    <button class="report-option-btn" data-report="checkout" style="background-color: #28a745; color: white; border: none; padding: 29px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; text-align: left; cursor: pointer; width: 100%;">
-                                        Sales/Checkout
+                                    <button class="report-option-btn" data-report="sales" style="background-color: #28a745; color: white; border: none; padding: 29px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; text-align: center; cursor: pointer; width: 100%;">
+                                        Sales <i class="fa fa-shopping-cart" style="margin-left: 24px;"></i>
                                     </button>
-                                    <button class="report-option-btn" data-report="items" style="background-color: #28a745; color: white; border: none; padding: 29px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; text-align: left; cursor: pointer; width: 100%;">
-                                        Items
-                                    </button>
-                                    <button class="report-option-btn" data-report="analysis" style="background-color: #28a745; color: white; border: none; padding: 29px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; text-align: left; cursor: pointer; width: 100%;">
-                                        Item Analysis*
+                                    <button class="report-option-btn" data-report="items" style="background-color: #17a2b8; color: white; border: none; padding: 29px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; text-align: center; cursor: pointer; width: 100%;">
+                                        Items <i class="fa fa-cubes" style="margin-left: 24px;"></i>
                                     </button>
                                 </div>
                             </div>
@@ -154,14 +158,257 @@
             </div>
         </div>
 
-        <!-- Future Content - Restore 2:3 ratio -->
-        <div class="col-8" style="padding: 8px;">
-            <div class="info_pad" style="background-color: #FEC620; min-height: 300px; padding: 16px; border-radius: 8px;">
-                <h5 class="text-center" style="color: #333; margin-bottom: 16px;"><b>Payment Analytics</b></h5>
-                <div class="text-center" style="color: #666;">
-                    <p><i class="fa fa-chart-bar fa-3x" style="margin-bottom: 16px;"></i></p>
-                    <p>Advanced payment analytics and reporting tools</p>
-                    <small>To Be Defined</small>
+        <!-- How To Use: Payments Section - Restore 2:3 ratio -->
+        <div class="col-8" style="background-color: #FEC620; min-height: 300px; padding: 8px; border-radius: 8px; height: 1500px;" id="right-panel-content">
+            <!-- System Information Panel - Hidden by default, shown in first-time/expired states -->
+            <div id="system-info-panel" style="display: none; height: 100%; border-radius: 8px; overflow: hidden;">
+                <!-- Top Section: Darker Yellow (25% height) -->
+                <div style="height: 25%; background-color: #E6A800; padding: 16px; display: flex; align-items: stretch;">
+                    <!-- Left Side: Shop Details -->
+                    <div style="flex: 1; padding: 20px; background-color: rgba(255,255,255,0.9); border-radius: 12px; border: 2px solid #333; margin-right: 16px; box-shadow: 0 4px 8px rgba(0,0,0,0.15);">
+                        <h6 style="color: #333; margin: 0 0 16px 0; font-weight: bold; font-size: 16px; text-align: center; text-transform: uppercase; letter-spacing: 1px;">Business Information</h6>
+                        <div style="font-size: 12px; line-height: 1.6; color: #333;">
+                            <div style="display: flex; gap: 6px; margin-bottom: 4px;"><span><strong>Name:</strong></span> <span>Jaystar Investment Limited</span></div>
+                            <div style="display: flex; gap: 6px; margin-bottom: 4px;"><span><strong>Pin:</strong></span> <span>P051338755P</span></div>
+                            <div style="display: flex; gap: 6px; margin-bottom: 4px;"><span><strong>Till:</strong></span> <span>476921</span></div>
+                            <div style="display: flex; gap: 6px; margin-bottom: 4px;"><span><strong>Store:</strong></span> <span>Jaystar Supermarket</span></div>
+                            <div style="display: flex; gap: 6px; margin-bottom: 4px;"><span><strong>Location:</strong></span> <span>Kimunye, Kirinyaga</span></div>
+                            <div style="display: flex; gap: 6px; margin-bottom: 4px;"><span><strong>Address:</strong></span> <span>952-10300, Kerugoya</span></div>
+                            <div style="display: flex; gap: 6px; margin-bottom: 4px;"><span><strong>Tel:</strong></span> <span>0722563363</span></div>
+                            <div style="display: flex; gap: 6px; margin-bottom: 4px;"><span><strong>Email:</strong></span> <span>jeffkarua@yahoo.com</span></div>
+                            <div style="display: flex; gap: 6px;"><span><strong>Owner:</strong></span> <span>Jeffitah Karua</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Right Side: System Time -->
+                    <div style="flex: 0 0 240px; text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 24px;">
+                        <h6 style="color: #333; margin: 0 0 20px 0; font-weight: bold; font-size: 18px; text-transform: uppercase; letter-spacing: 1px;">System Time</h6>
+                        <div style="font-size: 32px; font-weight: bold; color: #333; background-color: rgba(255,255,255,0.95); padding: 16px 24px; border-radius: 12px; border: 3px solid #333; min-width: 140px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);" id="sys-system-time">--:--</div>
+                        <div style="font-size: 14px; color: #666; margin-top: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Live Clock</div>
+                        <div style="font-size: 10px; color: #888; margin-top: 4px;">Real-time</div>
+
+                        <!-- APK Connection Status - Below Time -->
+                        <div id="apk-connection-status" style="display: flex; align-items: center; justify-content: center; margin-top: 16px; font-size: 12px; font-weight: 500;">
+                            <span id="connection-dot" style="width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background-color: #ffc107; animation: pulse 2s infinite;"></span>
+                            <span id="connection-text" style="color: #666;">Checking connection...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom Section: Current Yellow (75% height) -->
+                <div style="height: 75%; background-color: #FEC620; padding: 16px;">
+                    <!-- License Selection Interface - Hidden by default -->
+                    <div id="license-selection" style="display: none; text-align: center;">
+                        <h5 style="color: #333; margin-bottom: 24px;"><b>Select License Duration</b></h5>
+                        <div style="display: flex; justify-content: center; gap: 20px; margin-bottom: 20px;">
+                            <button id="license-183-btn" style="background-color: #28a745; color: white; border: none; padding: 15px 25px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; min-width: 120px;">
+                                183 Days
+                            </button>
+                            <button id="license-366-btn" style="background-color: #007bff; color: white; border: none; padding: 15px 25px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; min-width: 120px;">
+                                366 Days
+                            </button>
+                        </div>
+                        <div style="color: #666; font-size: 12px;">
+                            <p>Choose your preferred license duration</p>
+                        </div>
+                    </div>
+
+                    <!-- License QR Display - Hidden by default -->
+                    <div id="license-qr-display" style="display: none; text-align: center;">
+                        <div id="selected-license-info" style="margin-bottom: 20px;">
+                            <!-- Selected license button will be shown here -->
+                        </div>
+                        <div id="qr-code-container">
+                            <!-- QR code will be shown here -->
+                        </div>
+                        <div style="color: #666; font-size: 12px; margin-top: 16px;">
+                            <p>Scan QR code with BluPOS APK to activate license</p>
+                        </div>
+                    </div>
+
+                    <!-- Default Setup Message -->
+                    <div id="default-setup-message">
+                        <h5 class="text-center" style="color: #333; margin-bottom: 16px;"><b>Device Setup Required</b></h5>
+                        <div style="text-align: center; color: #666; font-size: 14px;">
+                            <p>Please activate your device to access all features.</p>
+                            <p style="margin-top: 20px;">Use the activation button on the left to get started.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Default Tutorial Panel -->
+            <div id="tutorial-panel">
+                <h5 class="text-center" style="color: #333; margin-bottom: 16px;"><b>How To Use: Payments</b></h5>
+
+            <!-- Sample Media Player Interface - Only Tutorial Section -->
+            <div class="text-center" style="color: #666;">
+                <div style="background-color: #333; border-radius: 8px; padding: 36px; margin: 16px auto; max-width: 984px;">
+                    <!-- Video Player Rectangle -->
+                    <div id="sample-media-player" style="background-color: #000; border-radius: 4px; height: 441px; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; cursor: pointer;" onclick="playSampleMedia()">
+                        <div style="color: white; font-size: 65px;">▶️</div>
+                    </div>
+
+                    <!-- Play Controls -->
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 12px;">
+                        <button id="play-btn" style="background-color: #182A62; color: white; border: none; border-radius: 4px; padding: 8px 16px; cursor: pointer;" onclick="playSampleMedia()">
+                            <i class="fa fa-play"></i> Play
+                        </button>
+                        <button id="pause-btn" style="background-color: #666; color: white; border: none; border-radius: 4px; padding: 8px 16px; cursor: pointer;" onclick="pauseSampleMedia()">
+                            <i class="fa fa-pause"></i> Pause
+                        </button>
+                    </div>
+
+                    <!-- Progress Bar -->
+                    <div style="width: 100%; height: 4px; background-color: #666; border-radius: 2px; margin-bottom: 8px;">
+                        <div id="progress-bar" style="width: 0%; height: 100%; background-color: #182A62; border-radius: 2px;"></div>
+                    </div>
+
+                    <!-- Time Display -->
+                    <div style="color: white; font-size: 12px; text-align: center;">
+                        <span id="current-time">0:00</span> / <span id="total-time">0:30</span>
+                    </div>
+                </div>
+
+                <!-- Test Link -->
+                <div style="margin-top: 16px;">
+                    <a href="#" onclick="testMediaPlayer()" style="color: #182A62; text-decoration: none; font-weight: bold;">
+                        <i class="fa fa-external-link"></i> Test Media Player Functions
+                    </a>
+                </div>
+
+                <p style="margin-top: 16px; font-size: 14px;">
+                    <small>Sample demonstration of payment processing workflow</small>
+                </p>
+            </div>
+
+            <!-- User Management Interface - Hidden by default, shown when User button is pressed -->
+            <div id="user-management-interface" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: #FEC620; padding: 8px; border-radius: 8px; z-index: 10;">
+                <h5 class="text-center" style="color: #333; margin-bottom: 16px;"><b>User Management</b></h5>
+
+                <!-- User Creation Form -->
+                <div class="user-creation-section" style="margin-top: 24px; padding: 20px; background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef;">
+                    <h5 style="color: #333; margin-bottom: 16px;"><b>Create New User Account</b></h5>
+
+                    <form action="/add_user" method="post" class="container" style="padding: 0;">
+                        <div class="row" style="margin-bottom: 16px;">
+                            <div class="col-6">
+                                <label for="user_role" style="font-weight: bold; color: #333;">Role:</label>
+                                <select name="user_role" id="user_role" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; margin-top: 4px;">
+                                    <option value="Sale">Sales</option>
+                                    <option value="Inventory">Inventory</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label for="user_name" style="font-weight: bold; color: #333;">Username:</label>
+                                <input type="text" name="user_name" id="user_name" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; margin-top: 4px;">
+                            </div>
+                        </div>
+
+                        <div class="row" style="margin-bottom: 16px;">
+                            <div class="col-6">
+                                <label for="password" style="font-weight: bold; color: #333;">Password:</label>
+                                <input type="password" name="password" id="password" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; margin-top: 4px;">
+                            </div>
+                            <div class="col-6">
+                                <label for="confirm_password" style="font-weight: bold; color: #333;">Confirm Password:</label>
+                                <input type="password" name="confirm_password" id="confirm_password" onkeyup="pass_match()" onkeydown="pass_match()" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; margin-top: 4px;">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-12">
+                                <p id="password_warning" style="display: none; color: #dc3545; font-size: 14px; margin: 8px 0;">
+                                    Passwords don't match, enter password then confirm password
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-12">
+                                <button class="form_product_type" type="submit" style="display: none;" id="user_submit_btn">
+                                    <span class="form_upper_type_label" style="background-color: #182A62; color: white; padding: 12px 24px; border-radius: 4px; display: inline-block; width: 100%; text-align: center; font-weight: bold;">
+                                        Create User Account
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- User Listing Table -->
+                <div class="user-listing-section" style="margin-top: 24px; padding: 20px; background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h5 style="margin: 0; color: #333;"><b>Existing User Accounts</b></h5>
+                        <button id="export-users-btn" style="background-color: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;" onclick="exportUsers()">
+                            <i class="fa fa-download"></i> Export Users
+                        </button>
+                    </div>
+
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse;" id="user_table">
+                            <thead>
+                                <tr style="background-color: #e9ecef;">
+                                    <th style="padding: 12px; text-align: left; border: 1px solid #dee2e6; color: #333;">ID</th>
+                                    <th style="padding: 12px; text-align: left; border: 1px solid #dee2e6; color: #333;">Username</th>
+                                    <th style="padding: 12px; text-align: left; border: 1px solid #dee2e6; color: #333;">Role</th>
+                                    <th style="padding: 12px; text-align: left; border: 1px solid #dee2e6; color: #333;">Last Login</th>
+                                    <th style="padding: 12px; text-align: left; border: 1px solid #dee2e6; color: #333;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="user-table-body">
+                                {% for user in users -%}
+                                <tr>
+                                    <td style="padding: 12px; border: 1px solid #dee2e6;">{{user.id}}</td>
+                                    <td style="padding: 12px; border: 1px solid #dee2e6;">{{user.user_name}}</td>
+                                    <td style="padding: 12px; border: 1px solid #dee2e6;">{{user.role}}</td>
+                                    <td style="padding: 12px; border: 1px solid #dee2e6;">{{user.updated_at}}</td>
+                                    <td style="padding: 12px; border: 1px solid #dee2e6;">
+                                        {% if user.role == 'Admin' -%}
+                                        {% else -%}
+                                            <form action="/delete_user" method="post" style="display: inline;">
+                                                <input type="hidden" name="user_id" value="{{user.id}}">
+                                            <button class="form_product_type" type="submit" id="user_delete_btn" style="background-color: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+                                                Delete
+                                            </button>
+                                            </form>
+                                        {%- endif %}
+                                    </td>
+                                </tr>
+                                {%- endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sales Report PDF Interface - Hidden by default, shown when Sales button is pressed -->
+            <div id="sales-report-pdf-interface" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: #FEC620; padding: 8px; border-radius: 8px; z-index: 10; overflow: auto;">
+                <h5 class="text-center" style="color: #333; margin-bottom: 16px;"><b>Sales Report</b></h5>
+
+                <!-- Sales Report PDF Content -->
+                <div class="sales-report-pdf-content" style="margin-top: 24px; padding: 20px; background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <div></div> <!-- Empty left side for spacing -->
+                        <div style="display: flex; gap: 10px;">
+                            <button id="cancel-sales-pdf-btn" style="background-color: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;" onclick="window.location.reload()">
+                                <i class="fa fa-refresh"></i> Refresh
+                            </button>
+                            <button id="print-sales-pdf-btn" style="background-color: #182A62; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;" onclick="printSalesPDF()">
+                                <i class="fa fa-print"></i> Print PDF
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- PDF Viewer Container -->
+                    <div style="overflow: auto; border: 1px solid #dee2e6; border-radius: 4px; background-color: white;">
+                        <div id="sales-pdf-container" style="width: 100%; min-height: 600px;">
+                            <!-- PDF content will be loaded here -->
+                            <div style="padding: 20px; text-align: center; color: #666;">
+                                <p>Loading sales report PDF...</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -170,6 +417,55 @@
     <p class="spacer" style="height: 18px;">
 
     </p>
+</div>
+
+<!-- Sales Report Period Selection Modal -->
+<div class="modal fade" id="salesReportModal" tabindex="-1" aria-labelledby="salesReportModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content" style="border: 2px solid #182A62; background-color: #FEC620;">
+            <div class="modal-header" style="background-color: #182A62; color: white;">
+                <h5 class="modal-title" id="salesReportModalLabel">Select Sales Report Period</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" style="background-color: #FEC620;">
+                <form id="salesReportForm">
+                    <div class="mb-3">
+                        <label style="color: #182A62; font-weight: bold; margin-bottom: 10px; display: block;">Report Period:</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="reportPeriod" id="printAll" value="all" checked onchange="toggleDateFields()">
+                            <label class="form-check-label" for="printAll" style="color: #182A62; font-weight: bold;">
+                                Print All Records
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="reportPeriod" id="todayOnly" value="today" onchange="toggleDateFields()">
+                            <label class="form-check-label" for="todayOnly" style="color: #182A62; font-weight: bold;">
+                                Today's Sales Only
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="reportPeriod" id="customRange" value="custom" onchange="toggleDateFields()">
+                            <label class="form-check-label" for="customRange" style="color: #182A62; font-weight: bold;">
+                                Custom Date Range
+                            </label>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="startDate" class="form-label" style="color: #182A62; font-weight: bold;">Start Date</label>
+                        <input type="date" class="form-control" id="startDate" required style="border-color: #182A62;">
+                    </div>
+                    <div class="mb-3">
+                        <label for="endDate" class="form-label" style="color: #182A62; font-weight: bold;">End Date</label>
+                        <input type="date" class="form-control" id="endDate" required style="border-color: #182A62;">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer" style="border-top: 2px solid #182A62;">
+                <button type="button" class="btn btn-outline-secondary" onclick="close_sales_modal()" style="border-color: #182A62; color: #182A62;">Cancel</button>
+                <button type="button" class="btn" onclick="generate_sales_report()" style="background-color: #182A62; border-color: #182A62; color: white;">Generate Report PDF</button>
+            </div>
+        </div>
+    </div>
 </div>
 <div class="container" style="position: relative; margin: auto;">
     <div class="middle_container">
@@ -200,116 +496,7 @@
 
             {%- endif %}
 
-        
-        <!-- User Management Sections - Dynamically shown/hidden -->
-        <div id="user-management-sections" style="display: none;">
-            <!-- add user component -->
-            <div class="after-container4">
-            <p class="spacer" style="height: 12px;"></p>
-            <div class="info_pad">
-                <form action="/add_user" method="post" class="container">
-                    <div class="row">
-                        <div class="col-1"></div>
-                        <div class="col-10">
-                            <h3 class="text-center"><b>Add User </b></h3>
-                            <br>
-                        </div>
-                        <div class="col-1"></div>
-                    </div>
-                    <div class="row">
-                        <div class=col-6>
-                            <div class="">
-                                <label for=""> Role :</label>
-                                <select name="user_role" id="">
-                                    <option value="Sale">Sales</option>
-                                    <option value="Inventory">Inventory</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class=col-6>
-                            <div class="row">
-                                <div class="col-3">
-                                    <label for=""> Username</label>
-                                </div>
-                                <div class="col-3">
-                                    <input type="text" name="user_name" id="user_name" required>
-                                </div>
-                            </div>
-                            <div class="row">
-                                <div class="col-3">
-                                    <label for=""> Password</label>
-                                </div>
-                                <div class="col-3">
-                                    <input type="password" name="password" id="password" required>
-                                </div>
-                            </div>
-                            <div class="row">
-                                <div class="col-3">
-                                    <label for=""> Confirm</label>
-                                </div>
-                                <div class="col-3">
-                                    <input type="password" name="confirm_password" id="confirm_password" onkeyup="pass_match()" onkeydown="pass_match()" required>
-                                </div>
-                            </div>
-                            <p id="password_warning" style="display: none;">
-                                Passwords don't match, enter password then confirm password
-                            </p>
-                        </div>
-                    </div>
-                    <br>
-                    <button class="form_product_type" type="submit" style="display: none;" id="user_submit_btn">
-                        <span class="form_upper_type_label">
-                            <h4 class="text-center" style="font-weight: bold; color:white">Add</h4>
-                        </span>
-                    </button>
-                </form>
-            </div>
-            <p class="spacer" style="height: 18px;"></p>
-            </div>
 
-            <!-- list table records component-->
-            <div class="after-container4" id="user_listing_container">
-            <p class="spacer" style="height: 12px;"></p>
-            <div class="info_pad">
-                <h3 class="text-center"><b>Accounts</b></h3>
-                <table style="width: 100%;" id="user_table">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Username</th>
-                            <th>Role</th>
-                            <th>Login</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="user-table-body">
-                        {% for user in users -%}
-                        <tr>
-                            <td>{{user.id}}</td>
-                            <td>{{user.user_name}}</td>
-                            <td>{{user.role}}</td>
-                            <td>{{user.updated_at}}</td>
-                            <td>
-                                {% if user.role == 'Admin' -%}
-                                {% else -%}
-                                    <form action="/delete_user" method="post">
-                                        <input type="hidden" name="user_id" value="{{user.id}}">
-                                        <button class="form_product_type" type="submit" id="user_delete_btn">
-                                            <span class="form_upper_type_label">
-                                                <h4 class="text-center" style="font-weight: bold; color:white">Delete</h4>
-                                            </span>
-                                        </button>
-                                    </form>
-                                {%- endif %}
-                            </td>
-                        </tr>
-                        {%- endfor %}
-                    </tbody>
-                </table>
-            </div>
-            <p class="spacer" style="height: 18px;"></p>
-            </div>
-        </div>
 
 
         <!-- check if sector_c is True-->
@@ -575,11 +762,11 @@ document.addEventListener('DOMContentLoaded', function() {
         // Ensure activation button is visible and properly styled for first-time state
         const activateBtn = document.querySelector('#apk-activate-btn');
         if (activateBtn) {
-            console.log('🔘 Setting up activation button - visual only, no action');
+            console.log('🔘 Setting up activation button - clickable for system info');
             activateBtn.style.display = 'block';
             activateBtn.textContent = 'Activate Device';
-            activateBtn.disabled = true;
-            activateBtn.style.cursor = 'default';
+            activateBtn.disabled = false;
+            activateBtn.style.cursor = 'pointer';
         }
     }
 
@@ -687,12 +874,181 @@ document.addEventListener('DOMContentLoaded', function() {
             const statusResult = await statusResponse.json();
             console.log('📊 Backend state received:', statusResult);
 
+            // Also fetch real-time sales data
+            await fetchRealTimeSales();
+
+            // Also fetch latest payments data
+            await fetchLatestPayments();
+
             // Update UI based on backend response
             updateUIFromBackend(statusResult);
 
         } catch (error) {
             console.error('❌ Backend state check error:', error);
         }
+    }
+
+    async function fetchRealTimeSales() {
+        try {
+            console.log('💰 Fetching real-time sales data...');
+
+            const salesResponse = await fetch('/get_total_sales', {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (!salesResponse.ok) {
+                console.error('❌ Sales data fetch failed:', salesResponse.status);
+                return;
+            }
+
+            const salesResult = await salesResponse.json();
+            console.log('💰 Sales data received:', salesResult);
+
+            if (salesResult.status === 'success') {
+                // Update the yellow card balance display
+                const balanceElement = document.querySelector('#total-balance-text');
+                if (balanceElement) {
+                    const formattedAmount = `KES ${parseFloat(salesResult.total_sales).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                    balanceElement.textContent = formattedAmount;
+                    console.log('💰 Updated balance display:', formattedAmount);
+                } else {
+                    console.error('❌ Balance display element not found');
+                }
+            } else {
+                console.error('❌ Sales data fetch returned error:', salesResult);
+            }
+
+        } catch (error) {
+            console.error('❌ Sales data fetch error:', error);
+        }
+    }
+
+    async function fetchLatestPayments() {
+        try {
+            console.log('💳 Fetching latest payments data...');
+
+            const paymentsResponse = await fetch('/get_latest_payments', {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (!paymentsResponse.ok) {
+                console.error('❌ Payments data fetch failed:', paymentsResponse.status);
+                return;
+            }
+
+            const paymentsResult = await paymentsResponse.json();
+            console.log('💳 Payments data received:', paymentsResult);
+
+            if (paymentsResult.status === 'success' && paymentsResult.payments) {
+                // Update the latest payments display
+                updateLatestPaymentsDisplay(paymentsResult.payments);
+            } else {
+                console.error('❌ Payments data fetch returned error:', paymentsResult);
+            }
+
+        } catch (error) {
+            console.error('❌ Payments data fetch error:', error);
+        }
+    }
+
+    function updateLatestPaymentsDisplay(payments) {
+        console.log('💳 Updating latest payments display:', payments);
+
+        const paymentsContainer = document.querySelector('#latest-payments');
+        if (!paymentsContainer) {
+            console.error('❌ Latest payments container not found');
+            return;
+        }
+
+        // Clear existing payments
+        paymentsContainer.innerHTML = '';
+
+        // Display up to 4 latest payments
+        const displayPayments = payments.slice(0, 4);
+
+        if (displayPayments.length === 0) {
+            // No payments available
+            const noPaymentsDiv = document.createElement('div');
+            noPaymentsDiv.style.backgroundColor = 'white';
+            noPaymentsDiv.style.border = '1px solid #ddd';
+            noPaymentsDiv.style.padding = '29px 24px';
+            noPaymentsDiv.style.borderRadius = '8px';
+            noPaymentsDiv.style.fontSize = '16px';
+            noPaymentsDiv.style.fontWeight = '600';
+            noPaymentsDiv.style.color = '#333';
+            noPaymentsDiv.style.textAlign = 'center';
+            noPaymentsDiv.style.width = '100%';
+            noPaymentsDiv.textContent = 'No recent payments';
+            paymentsContainer.appendChild(noPaymentsDiv);
+            return;
+        }
+
+        // Create payment display elements
+        displayPayments.forEach((payment, index) => {
+            const paymentDiv = document.createElement('div');
+            paymentDiv.style.backgroundColor = 'white';
+            paymentDiv.style.border = '1px solid #ddd';
+            paymentDiv.style.padding = '12px 16px';
+            paymentDiv.style.borderRadius = '8px';
+            paymentDiv.style.fontSize = '12px';
+            paymentDiv.style.fontWeight = '600';
+            paymentDiv.style.color = '#333';
+            paymentDiv.style.textAlign = 'left';
+            paymentDiv.style.cursor = 'default';
+            paymentDiv.style.width = '100%';
+            paymentDiv.style.marginBottom = '8px';
+
+            // Format payment information
+            const paymentType = payment.payment_type || 'Cash';
+            const salesPerson = payment.sales_person || 'Unknown';
+            const amount = payment.amount || '0.00';
+            const datetime = payment.datetime ? new Date(payment.datetime).toLocaleString('en-KE', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            }) : 'Unknown';
+            const checkoutId = payment.checkout_id || 'N/A';
+
+            paymentDiv.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px;">
+                    <div style="font-weight: bold;">${paymentType} - KES ${amount}</div>
+                    <div style="color: #666; font-size: 10px; text-align: right;">Clerk: ${salesPerson}</div>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px;">
+                    <div style="color: #666; font-size: 10px;">${datetime}</div>
+                    <div style="color: #666; font-size: 10px; text-align: right;">ID: ${checkoutId}</div>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; padding-top: 4px; border-top: 1px solid #ddd;">
+                    <div style="font-weight: bold; color: #28a745; font-size: 11px;">Change: KES ${payment.balance}</div>
+                    <div style="font-size: 10px; color: #666; text-align: right;">Net: KES ${(parseFloat(amount) - parseFloat(payment.balance)).toFixed(2)}</div>
+                </div>
+            `;
+
+            paymentsContainer.appendChild(paymentDiv);
+        });
+
+        // Fill remaining slots with empty divs if less than 4 payments
+        const remainingSlots = 4 - displayPayments.length;
+        for (let i = 0; i < remainingSlots; i++) {
+            const emptyDiv = document.createElement('div');
+            emptyDiv.style.backgroundColor = '#f8f8f8';
+            emptyDiv.style.border = '1px solid #ddd';
+            emptyDiv.style.padding = '29px 24px';
+            emptyDiv.style.borderRadius = '8px';
+            emptyDiv.style.fontSize = '16px';
+            emptyDiv.style.fontWeight = '600';
+            emptyDiv.style.color = '#999';
+            emptyDiv.style.textAlign = 'center';
+            emptyDiv.style.width = '100%';
+            emptyDiv.textContent = '-';
+            paymentsContainer.appendChild(emptyDiv);
+        }
+
+        console.log('✅ Latest payments display updated');
     }
 
     function updateUIFromBackend(backendState) {
@@ -808,17 +1164,9 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('❌ Expiry date element not found');
         }
 
-        // Update balance display
-        const balanceElement = document.querySelector('#total-balance-text');
-        if (balanceElement) {
-            let newBalance = 'KES 0.00';
-            if (isActivated) newBalance = 'KES 12,345.67';
-            if (isExpired) newBalance = 'KES 0.00';
-            console.log('💰 Updating balance display:', newBalance);
-            balanceElement.textContent = newBalance;
-        } else {
-            console.error('❌ Balance display element not found');
-        }
+        // Note: Balance display is now handled by fetchRealTimeSales() function
+        // which updates it with actual database values every 2 seconds
+        console.log('💰 Balance display handled by real-time sales fetch');
     }
 
     function showCardSection(isFirstTime, isActivated, isExpired) {
@@ -905,6 +1253,22 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('🔍 Available buttons:', Array.from(document.querySelectorAll('button')).map(btn => btn.id));
         }
 
+        // User Management button - shows user management interface with animation
+        const userBtn = document.querySelector('#user-btn');
+        if (userBtn) {
+            userBtn.onclick = function() {
+                console.log('🎯 USER MANAGEMENT BUTTON PRESSED - PAUSING POLLING FOR 30 SECONDS');
+                console.log('🔄 Stopping background polling...');
+                stopPollingTemporarily();
+                console.log('🎬 Initiating user management animation...');
+                animateToUserManagement();
+            };
+            console.log('✅ User Management button handler configured');
+        } else {
+            console.error('❌ User Management button not found in DOM');
+            console.log('🔍 Available buttons:', Array.from(document.querySelectorAll('button')).map(btn => btn.id));
+        }
+
         // Share button - placeholder
         const shareBtn = document.querySelector('#share-btn');
         if (shareBtn) {
@@ -915,15 +1279,160 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function setupFirstTimeButtons() {
+        console.log('🔧 Setting up first-time state buttons...');
+
+        // In first-time state, only the activate button shows system info panel
+        // Other buttons do nothing (disabled state)
+
+        // Report button - disabled in first-time state
+        const reportBtn = document.querySelector('#report-btn');
+        if (reportBtn) {
+            reportBtn.onclick = function() {
+                console.log('🎯 REPORT BUTTON PRESSED (FIRST-TIME) - DISABLED');
+                // Do nothing - button appears disabled
+            };
+            console.log('✅ First-time report button handler configured (disabled)');
+        }
+
+        // User Management button - disabled in first-time state
+        const userBtn = document.querySelector('#user-btn');
+        if (userBtn) {
+            userBtn.onclick = function() {
+                console.log('🎯 USER MANAGEMENT BUTTON PRESSED (FIRST-TIME) - DISABLED');
+                // Do nothing - button appears disabled
+            };
+            console.log('✅ First-time user management button handler configured (disabled)');
+        }
+
+        // Share button - disabled in first-time state
+        const shareBtn = document.querySelector('#share-btn');
+        if (shareBtn) {
+            shareBtn.onclick = function() {
+                console.log('🎯 SHARE BUTTON PRESSED (FIRST-TIME) - DISABLED');
+                // Do nothing - button appears disabled
+            };
+            console.log('✅ First-time share button handler configured (disabled)');
+        }
+    }
+
+    function setupExpiredButtons() {
+        console.log('🔧 Setting up expired state buttons...');
+
+        // In expired state, only the reactivate button shows system info panel
+        // Other buttons do nothing (disabled state)
+
+        // Report button - disabled in expired state
+        const reportBtn = document.querySelector('#report-btn');
+        if (reportBtn) {
+            reportBtn.onclick = function() {
+                console.log('🎯 REPORT BUTTON PRESSED (EXPIRED) - DISABLED');
+                // Do nothing - button appears disabled
+            };
+            console.log('✅ Expired report button handler configured (disabled)');
+        }
+
+        // User Management button - disabled in expired state
+        const userBtn = document.querySelector('#user-btn');
+        if (userBtn) {
+            userBtn.onclick = function() {
+                console.log('🎯 USER MANAGEMENT BUTTON PRESSED (EXPIRED) - DISABLED');
+                // Do nothing - button appears disabled
+            };
+            console.log('✅ Expired user management button handler configured (disabled)');
+        }
+
+        // Share button - disabled in expired state
+        const shareBtn = document.querySelector('#share-btn');
+        if (shareBtn) {
+            shareBtn.onclick = function() {
+                console.log('🎯 SHARE BUTTON PRESSED (EXPIRED) - DISABLED');
+                // Do nothing - button appears disabled
+            };
+            console.log('✅ Expired share button handler configured (disabled)');
+        }
+    }
+
     function setupExpiredStateButtons() {
-        // Reactivate button - visual only (no action)
+        // Reactivate button - shows system info panel in expired state
         const reactivateBtn = document.querySelector('#reactivate-btn');
         if (reactivateBtn) {
             reactivateBtn.onclick = function() {
-                console.log('🔄 Reactivate button clicked - visual only');
-                // No action - visual consistency with APK
+                console.log('🔄 Reactivate button clicked - showing system info panel');
+                showSystemInfoPanel();
             };
         }
+    }
+
+    function showSystemInfoPanel() {
+        console.log('📊 Showing system information panel');
+
+        // Hide tutorial panel and show system info panel
+        const tutorialPanel = document.querySelector('#tutorial-panel');
+        const systemInfoPanel = document.querySelector('#system-info-panel');
+
+        if (tutorialPanel) tutorialPanel.style.display = 'none';
+        if (systemInfoPanel) {
+            systemInfoPanel.style.display = 'block';
+            // Update system information
+            updateSystemInfo();
+            // Setup license selection buttons and show license selection interface
+            setupLicenseSelection();
+            // Always show license selection interface when called from activate/reactivate buttons
+            document.querySelector('#license-selection').style.display = 'block';
+            document.querySelector('#license-qr-display').style.display = 'none';
+            document.querySelector('#default-setup-message').style.display = 'none';
+            console.log('✅ System information panel displayed with license selection');
+        }
+    }
+
+    function updateSystemInfo() {
+        console.log('🔄 Updating system information');
+
+        // Update device ID
+        const deviceIdElement = document.querySelector('#sys-device-id');
+        if (deviceIdElement && currentDeviceId) {
+            let deviceDisplay = '--';
+            if (currentDeviceId.startsWith('device_')) {
+                deviceDisplay = currentDeviceId.replace('device_', '');
+            }
+            deviceIdElement.textContent = deviceDisplay;
+        }
+
+        // Update network time (same as main display)
+        const networkTimeElement = document.querySelector('#sys-network-time');
+        if (networkTimeElement) {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            });
+            networkTimeElement.textContent = timeString;
+        }
+
+        // Update license status
+        const licenseStatusElement = document.querySelector('#sys-license-status');
+        if (licenseStatusElement) {
+            const statusText = document.querySelector('#license-status-text');
+            if (statusText) {
+                licenseStatusElement.textContent = statusText.textContent;
+            }
+        }
+
+        // Update system time
+        const systemTimeElement = document.querySelector('#sys-system-time');
+        if (systemTimeElement) {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            });
+            systemTimeElement.textContent = timeString;
+        }
+
+        console.log('✅ System information updated');
     }
 
     function animateToReports() {
@@ -977,18 +1486,26 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const activeSection = document.querySelector('#active-state-section');
         const reportsInterface = document.querySelector('#reports-interface');
+        const userManagementInterface = document.querySelector('#user-management-interface');
 
-        if (!activeSection || !reportsInterface) {
-            console.error('❌ Animation elements not found');
+        if (!activeSection) {
+            console.error('❌ Active section not found');
             return;
         }
 
         try {
-            // Push reports interface right and hide it
-            reportsInterface.style.transform = 'translateX(100%)';
-            reportsInterface.style.opacity = '0';
-            reportsInterface.style.visibility = 'hidden';
-            reportsInterface.style.pointerEvents = 'none';
+            // Hide reports interface if visible
+            if (reportsInterface) {
+                reportsInterface.style.transform = 'translateX(100%)';
+                reportsInterface.style.opacity = '0';
+                reportsInterface.style.visibility = 'hidden';
+                reportsInterface.style.pointerEvents = 'none';
+            }
+
+            // Hide user management interface if visible
+            if (userManagementInterface) {
+                userManagementInterface.style.display = 'none';
+            }
 
             // Bring active section back from left and make it visible
             activeSection.style.transform = 'translateX(0)';
@@ -1005,6 +1522,71 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 300); // Match transition duration
         } catch (error) {
             console.error('❌ Animation error:', error);
+        }
+    }
+
+    function animateToUserManagement() {
+        console.log('🎬 Starting push-left animation to user management...');
+
+        const userManagementInterface = document.querySelector('#user-management-interface');
+
+        if (!userManagementInterface) {
+            console.error('❌ User management interface not found in DOM');
+            return;
+        }
+
+        console.log('✅ User management interface found - applying animation styles...');
+
+        try {
+            // Show user management interface with slide animation
+            userManagementInterface.style.display = 'block';
+            userManagementInterface.style.opacity = '0';
+            userManagementInterface.style.transform = 'translateX(100%)';
+
+            // Force reflow
+            userManagementInterface.offsetHeight;
+
+            // Animate to visible position
+            userManagementInterface.style.transition = 'opacity 0.3s ease-in-out, transform 0.3s ease-in-out';
+            userManagementInterface.style.opacity = '1';
+            userManagementInterface.style.transform = 'translateX(0)';
+
+            // Setup back button after animation completes
+            setTimeout(() => {
+                console.log('⏰ Animation complete - setting up user management interface');
+                setupUserManagementInterface();
+            }, 300);
+        } catch (error) {
+            console.error('❌ User management animation error:', error);
+        }
+    }
+
+    function animateBackToTutorial() {
+        console.log('🎬 Starting reverse animation back to tutorial...');
+
+        const userManagementInterface = document.querySelector('#user-management-interface');
+
+        if (!userManagementInterface) {
+            console.error('❌ User management interface not found');
+            return;
+        }
+
+        try {
+            // Hide user management interface
+            userManagementInterface.style.transition = 'opacity 0.3s ease-in-out, transform 0.3s ease-in-out';
+            userManagementInterface.style.opacity = '0';
+            userManagementInterface.style.transform = 'translateX(100%)';
+
+            // Resume polling when going back to active state
+            startReactivePolling();
+
+            // Hide interface completely after animation
+            setTimeout(() => {
+                userManagementInterface.style.display = 'none';
+                console.log('⏰ Animation complete - user management interface hidden');
+            }, 300); // Match transition duration
+        } catch (error) {
+            console.error('❌ User management reverse animation error:', error);
         }
     }
 
@@ -1028,7 +1610,16 @@ document.addEventListener('DOMContentLoaded', function() {
             btn.onclick = function() {
                 const reportType = this.getAttribute('data-report');
                 console.log('📋 Report option clicked:', reportType);
-                alert(`Report: ${reportType} - Coming Soon!`);
+
+                if (reportType === 'sales') {
+                    console.log('🎯 SALES REPORT BUTTON PRESSED - SHOWING MODAL');
+                    show_sales_report_modal();
+                } else if (reportType === 'items') {
+                    console.log('🎯 ITEMS REPORT BUTTON PRESSED - LOADING ITEMS REPORT');
+                    loadItemsReport();
+                } else {
+                    alert(`Report: ${reportType} - Coming Soon!`);
+                }
             };
         });
 
@@ -1039,6 +1630,152 @@ document.addEventListener('DOMContentLoaded', function() {
                 alert('Print functionality - Coming Soon!');
             };
         }
+    }
+
+    function animateToSalesReport() {
+        console.log('🎬 Starting push-left animation to sales report PDF...');
+
+        const salesReportPDFInterface = document.querySelector('#sales-report-pdf-interface');
+
+        if (!salesReportPDFInterface) {
+            console.error('❌ Sales report PDF interface not found in DOM');
+            return;
+        }
+
+        console.log('✅ Sales report PDF interface found - applying animation styles...');
+
+        try {
+            // Show sales report PDF interface with slide animation
+            salesReportPDFInterface.style.display = 'block';
+            salesReportPDFInterface.style.opacity = '0';
+            salesReportPDFInterface.style.transform = 'translateX(100%)';
+
+            // Force reflow
+            salesReportPDFInterface.offsetHeight;
+
+            // Animate to visible position
+            salesReportPDFInterface.style.transition = 'opacity 0.3s ease-in-out, transform 0.3s ease-in-out';
+            salesReportPDFInterface.style.opacity = '1';
+            salesReportPDFInterface.style.transform = 'translateX(0)';
+
+            // Load sales PDF after animation completes
+            setTimeout(() => {
+                console.log('⏰ Animation complete - loading sales PDF');
+                loadSalesReportPDF();
+            }, 300);
+        } catch (error) {
+            console.error('❌ Sales report PDF animation error:', error);
+        }
+    }
+
+    function animateBackToReports() {
+        console.log('🎬 Starting reverse animation back to reports interface...');
+
+        const salesReportPDFInterface = document.querySelector('#sales-report-pdf-interface');
+
+        if (!salesReportPDFInterface) {
+            console.error('❌ Sales report PDF interface not found');
+            return;
+        }
+
+        try {
+            // Hide sales report PDF interface
+            salesReportPDFInterface.style.transition = 'opacity 0.3s ease-in-out, transform 0.3s ease-in-out';
+            salesReportPDFInterface.style.opacity = '0';
+            salesReportPDFInterface.style.transform = 'translateX(100%)';
+
+            // Resume polling when going back to active state
+            startReactivePolling();
+
+            // Hide interface completely after animation
+            setTimeout(() => {
+                salesReportPDFInterface.style.display = 'none';
+                console.log('⏰ Animation complete - sales report PDF interface hidden');
+            }, 300); // Match transition duration
+        } catch (error) {
+            console.error('❌ Sales report PDF reverse animation error:', error);
+        }
+    }
+
+    function loadSalesReportPDF() {
+        console.log('📄 Loading sales report PDF...');
+
+        // Get the current origin
+        const currentOrigin = window.location.origin;
+        
+        // Generate PDF URL (same as inventory page sales report)
+        const pdfUrl = `${currentOrigin}/get_sale_record_printout`;
+
+        // Get the PDF container
+        const pdfContainer = document.querySelector('#sales-pdf-container');
+        if (!pdfContainer) {
+            console.error('❌ Sales PDF container not found');
+            return;
+        }
+
+        // Clear existing content
+        pdfContainer.innerHTML = '';
+
+        // Create iframe to display PDF
+        const iframe = document.createElement('iframe');
+        iframe.src = pdfUrl;
+        iframe.style.width = '100%';
+        iframe.style.height = '800px';
+        iframe.style.border = 'none';
+        iframe.style.display = 'block';
+        iframe.style.overflow = 'hidden'; // Prevent iframe from scrolling
+        iframe.style.position = 'relative';
+
+        // Add loading indicator
+        const loadingDiv = document.createElement('div');
+        loadingDiv.style.textAlign = 'center';
+        loadingDiv.style.padding = '20px';
+        loadingDiv.style.color = '#666';
+        loadingDiv.innerHTML = '<p>Loading sales report PDF...</p>';
+
+        pdfContainer.appendChild(loadingDiv);
+        pdfContainer.appendChild(iframe);
+
+        // Handle iframe loading
+        iframe.onload = function() {
+            console.log('📄 Sales report PDF loaded successfully');
+            loadingDiv.style.display = 'none';
+        };
+
+        iframe.onerror = function() {
+            console.error('❌ Failed to load sales report PDF');
+            loadingDiv.innerHTML = '<p style="color: red;">Failed to load PDF. Please try again.</p>';
+        };
+    }
+
+    function printSalesPDF() {
+        console.log('🖨️ Printing sales PDF...');
+
+        // Get the PDF container
+        const pdfContainer = document.querySelector('#sales-pdf-container');
+        const iframe = pdfContainer.querySelector('iframe');
+
+        if (iframe && iframe.contentWindow) {
+            // Try to print the iframe content
+            try {
+                iframe.contentWindow.print();
+                console.log('✅ PDF print initiated');
+            } catch (error) {
+                console.error('❌ Error printing PDF:', error);
+                alert('Error printing PDF. Please use the print function in your browser.');
+            }
+        } else {
+            console.error('❌ PDF iframe not found or not loaded');
+            alert('PDF not loaded yet. Please wait for the PDF to load before printing.');
+        }
+    }
+
+    function setupUserManagementInterface() {
+        console.log('🔧 Setting up user management interface...');
+
+        // Note: User management interface uses static HTML, so no dynamic setup needed
+        // The forms and buttons are already in place in the HTML structure
+        console.log('✅ User management interface ready - forms and tables are static HTML');
     }
 
     function updateYellowCard(isActivated, licenseType, licenseExpiry, deviceId) {
@@ -1131,8 +1868,598 @@ document.addEventListener('DOMContentLoaded', function() {
         alert('Reset to first-time state');
     }
 
+    // Sample Media Player Functions
+    let mediaInterval = null;
+    let currentTime = 0;
+    let isPlaying = false;
+    const totalDuration = 30; // 30 seconds sample
+
+    function playSampleMedia() {
+        console.log('▶️ Starting sample media playback...');
+
+        if (isPlaying) {
+            console.log('ℹ️ Media already playing');
+            return;
+        }
+
+        isPlaying = true;
+        const playBtn = document.querySelector('#play-btn');
+        const pauseBtn = document.querySelector('#pause-btn');
+        const playerDiv = document.querySelector('#sample-media-player');
+
+        if (playBtn) playBtn.style.backgroundColor = '#28a745';
+        if (pauseBtn) pauseBtn.style.backgroundColor = '#666';
+
+        if (playerDiv) {
+            playerDiv.innerHTML = '<div style="color: white; font-size: 24px; text-align: center;">⏸️</div>';
+        }
+
+        // Simulate media progress
+        mediaInterval = setInterval(() => {
+            currentTime++;
+            updateMediaProgress();
+
+            if (currentTime >= totalDuration) {
+                pauseSampleMedia();
+                currentTime = 0;
+                updateMediaProgress();
+                alert('Sample media playback completed!');
+            }
+        }, 1000); // Update every second
+
+        console.log('✅ Sample media started');
+    }
+
+    function pauseSampleMedia() {
+        console.log('⏸️ Pausing sample media playback...');
+
+        isPlaying = false;
+        const playBtn = document.querySelector('#play-btn');
+        const pauseBtn = document.querySelector('#pause-btn');
+        const playerDiv = document.querySelector('#sample-media-player');
+
+        if (playBtn) playBtn.style.backgroundColor = '#182A62';
+        if (pauseBtn) pauseBtn.style.backgroundColor = '#666';
+
+        if (playerDiv) {
+            playerDiv.innerHTML = '<div style="color: white; font-size: 48px;">▶️</div>';
+        }
+
+        if (mediaInterval) {
+            clearInterval(mediaInterval);
+            mediaInterval = null;
+        }
+
+        console.log('✅ Sample media paused');
+    }
+
+    function updateMediaProgress() {
+        const progressBar = document.querySelector('#progress-bar');
+        const currentTimeEl = document.querySelector('#current-time');
+
+        if (progressBar) {
+            const progressPercent = (currentTime / totalDuration) * 100;
+            progressBar.style.width = `${progressPercent}%`;
+        }
+
+        if (currentTimeEl) {
+            const minutes = Math.floor(currentTime / 60);
+            const seconds = currentTime % 60;
+            currentTimeEl.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
+    }
+
+    function testMediaPlayer() {
+        console.log('🧪 Testing media player functions...');
+
+        // Reset to initial state
+        pauseSampleMedia();
+        currentTime = 0;
+        updateMediaProgress();
+
+        // Test sequence
+        setTimeout(() => {
+            console.log('🧪 Test 1: Auto-play after 2 seconds');
+            playSampleMedia();
+        }, 2000);
+
+        setTimeout(() => {
+            console.log('🧪 Test 2: Auto-pause after 5 seconds');
+            pauseSampleMedia();
+        }, 7000);
+
+        setTimeout(() => {
+            console.log('🧪 Test 3: Play again after 2 seconds');
+            playSampleMedia();
+        }, 9000);
+
+        setTimeout(() => {
+            console.log('🧪 Test 4: Let it complete (should auto-pause at 30s)');
+        }, 11000);
+
+        alert('Media player test sequence started! Watch the console and player for updates.');
+    }
+
+    function exportUsers() {
+        console.log('📊 Exporting users data...');
+
+        // Get the table element
+        const table = document.querySelector('#user_table');
+        if (!table) {
+            alert('User table not found!');
+            return;
+        }
+
+        // Collect CSV data
+        const csvData = [];
+
+        // Get headers
+        const headers = [];
+        const headerRow = table.querySelector('thead tr');
+        if (headerRow) {
+            headerRow.querySelectorAll('th').forEach(th => {
+                headers.push(th.textContent.trim());
+            });
+        }
+        csvData.push(headers);
+
+        // Get data rows
+        const tbody = table.querySelector('tbody');
+        if (tbody) {
+            tbody.querySelectorAll('tr').forEach(tr => {
+                const rowData = [];
+                tr.querySelectorAll('td').forEach(td => {
+                    rowData.push(td.textContent.trim());
+                });
+                csvData.push(rowData);
+            });
+        }
+
+        // Convert to CSV string
+        const csvString = csvData.map(row =>
+            row.map(field => `"${field.replace(/"/g, '""')}"`).join(',')
+        ).join('\n');
+
+        // Create and download file
+        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `users_export_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            console.log('✅ Users data exported successfully');
+            alert('Users data exported successfully!');
+        } else {
+            // Fallback for older browsers
+            alert('Export feature not supported in this browser. Please use a modern browser.');
+        }
+    }
+
+    // Store modal instance for later use
+    let salesReportModalInstance = null;
+
+    // Modal functions for sales reports
+    function show_sales_report_modal() {
+        console.log("Showing sales report modal");
+
+        // Set default selection to "Print All Records"
+        document.getElementById('printAll').checked = true;
+
+        // Disable date fields for "Print All"
+        document.getElementById('startDate').disabled = true;
+        document.getElementById('endDate').disabled = true;
+        document.getElementById('startDate').required = false;
+        document.getElementById('endDate').required = false;
+
+        // Show modal
+        salesReportModalInstance = new bootstrap.Modal(document.getElementById('salesReportModal'), {
+            backdrop: 'static', // Prevent closing by clicking backdrop
+            keyboard: true     // Allow closing with ESC key
+        });
+        salesReportModalInstance.show();
+    }
+
+    function close_sales_modal() {
+        console.log("Closing sales report modal");
+        if (salesReportModalInstance) {
+            salesReportModalInstance.hide();
+        }
+    }
+
+    function toggleDateFields() {
+        const selectedPeriod = document.querySelector('input[name="reportPeriod"]:checked').value;
+        const startDateField = document.getElementById('startDate');
+        const endDateField = document.getElementById('endDate');
+
+        if (selectedPeriod === 'all') {
+            // Disable date fields for "Print All Records"
+            startDateField.disabled = true;
+            endDateField.disabled = true;
+            startDateField.required = false;
+            endDateField.required = false;
+            startDateField.value = '';
+            endDateField.value = '';
+        } else if (selectedPeriod === 'today') {
+            // Set both dates to today for "Today's Sales Only"
+            const today = new Date().toISOString().split('T')[0];
+            startDateField.value = today;
+            endDateField.value = today;
+
+            // Disable date fields
+            startDateField.disabled = true;
+            endDateField.disabled = true;
+            startDateField.required = false;
+            endDateField.required = false;
+        } else if (selectedPeriod === 'custom') {
+            // Enable date fields for custom range
+            startDateField.disabled = false;
+            endDateField.disabled = false;
+            startDateField.required = true;
+            endDateField.required = true;
+        }
+    }
+
+    function generate_sales_report() {
+        console.log("Generating sales report");
+
+        const selectedPeriod = document.querySelector('input[name="reportPeriod"]:checked').value;
+
+        // Close modal
+        if (salesReportModalInstance) {
+            salesReportModalInstance.hide();
+        }
+
+        // Generate report URL based on selected period
+        const currentOrigin = window.location.origin;
+        let reportUrl;
+
+        if (selectedPeriod === 'all') {
+            // Print all records - no date parameters
+            reportUrl = `${currentOrigin}/get_sale_record_printout?format=html`;
+        } else {
+            // For today or custom range, get date values
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+
+            // Validate dates for custom range
+            if (selectedPeriod === 'custom') {
+                if (!startDate || !endDate) {
+                    alert("Please select both start and end dates");
+                    return;
+                }
+
+                if (new Date(startDate) > new Date(endDate)) {
+                    alert("Start date cannot be after end date");
+                    return;
+                }
+            }
+
+            reportUrl = `${currentOrigin}/get_sale_record_printout?format=html&start_date=${startDate}&end_date=${endDate}`;
+        }
+
+        // Load HTML report into col-8 section
+        console.log('Loading sales report into col-8 section:', reportUrl);
+
+        // Show the sales report interface and load the HTML report
+        animateToSalesReportHTML(reportUrl);
+    }
+
+    function animateToSalesReportHTML(reportUrl) {
+        console.log('🎬 Starting animation to sales report HTML...');
+
+        const salesReportHTMLInterface = document.querySelector('#sales-report-pdf-interface');
+
+        if (!salesReportHTMLInterface) {
+            console.error('❌ Sales report HTML interface not found in DOM');
+            return;
+        }
+
+        console.log('✅ Sales report HTML interface found - applying animation styles...');
+
+        try {
+            // Show sales report HTML interface with slide animation
+            salesReportHTMLInterface.style.display = 'block';
+            salesReportHTMLInterface.style.opacity = '0';
+            salesReportHTMLInterface.style.transform = 'translateX(100%)';
+
+            // Force reflow
+            salesReportHTMLInterface.offsetHeight;
+
+            // Animate to visible position
+            salesReportHTMLInterface.style.transition = 'opacity 0.3s ease-in-out, transform 0.3s ease-in-out';
+            salesReportHTMLInterface.style.opacity = '1';
+            salesReportHTMLInterface.style.transform = 'translateX(0)';
+
+            // Load HTML report after animation completes
+            setTimeout(() => {
+                console.log('⏰ Animation complete - loading HTML report');
+                loadSalesReportHTML(reportUrl);
+            }, 300);
+        } catch (error) {
+            console.error('❌ Sales report HTML animation error:', error);
+        }
+    }
+
+    function loadSalesReportHTML(reportUrl) {
+        console.log('📄 Loading sales report HTML...');
+
+        // Get the PDF container (reusing the same container name)
+        const pdfContainer = document.querySelector('#sales-pdf-container');
+        if (!pdfContainer) {
+            console.error('❌ Sales PDF container not found');
+            return;
+        }
+
+        // Clear existing content
+        pdfContainer.innerHTML = '';
+
+        // Create iframe to display HTML report
+        const iframe = document.createElement('iframe');
+        iframe.src = reportUrl;
+        iframe.style.width = '100%';
+        iframe.style.height = '800px';
+        iframe.style.border = 'none';
+        iframe.style.display = 'block';
+
+        // Add loading indicator
+        const loadingDiv = document.createElement('div');
+        loadingDiv.style.textAlign = 'center';
+        loadingDiv.style.padding = '20px';
+        loadingDiv.style.color = '#666';
+        loadingDiv.innerHTML = '<p>Loading sales report...</p>';
+
+        pdfContainer.appendChild(loadingDiv);
+        pdfContainer.appendChild(iframe);
+
+        // Handle iframe loading
+        iframe.onload = function() {
+            console.log('📄 Sales report HTML loaded successfully');
+            loadingDiv.style.display = 'none';
+        };
+
+        iframe.onerror = function() {
+            console.error('❌ Failed to load sales report HTML');
+            loadingDiv.innerHTML = '<p style="color: red;">Failed to load report. Please try again.</p>';
+        };
+    }
+
+    function loadItemsReport() {
+        console.log('📊 Loading items report...');
+
+        // Generate items report URL with HTML format
+        const currentOrigin = window.location.origin;
+        const reportUrl = `${currentOrigin}/get_items_report?format=html`;
+
+        // Load HTML report into col-8 section (reuse the same interface as sales report)
+        console.log('Loading items report into col-8 section:', reportUrl);
+
+        // Show the sales report interface and load the items HTML report
+        animateToSalesReportHTML(reportUrl);
+    }
+
+    // Global variable to store current license selection
+    let currentLicenseDays = null;
+
+    // License activation functions
+    async function selectLicense(licenseDays) {
+        console.log(`📋 License selected: ${licenseDays} days`);
+        currentLicenseDays = licenseDays; // Store for regeneration
+
+        // Ensure we have a device ID before generating QR
+        if (!currentDeviceId) {
+            console.log('🔍 Device ID not available, fetching from backend...');
+            await checkBackendState(); // This will set currentDeviceId
+        }
+
+        await generateLicenseQR(licenseDays);
+    }
+
+    async function generateLicenseQR(licenseDays) {
+        try {
+            const response = await fetch('/generate_license_qr', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    license_days: licenseDays,
+                    device_id: currentDeviceId || 'unknown'
+                })
+            });
+
+            if (!response.ok) {
+                console.error('❌ Failed to generate license QR:', response.status);
+                alert('Failed to generate license QR code. Please try again.');
+                return;
+            }
+
+            const result = await response.json();
+            console.log('📱 License QR generated:', result);
+
+            if (result.status === 'success') {
+                // Hide license selection and show QR display
+                document.querySelector('#license-selection').style.display = 'none';
+                document.querySelector('#license-qr-display').style.display = 'block';
+
+                // Update selected license info
+                const selectedInfo = document.querySelector('#selected-license-info');
+                selectedInfo.innerHTML = `
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <button style="background-color: ${licenseDays === 183 ? '#28a745' : '#007bff'}; color: white; border: none; padding: 15px 25px; border-radius: 8px; font-size: 16px; font-weight: 600; min-width: 120px; cursor: default;">
+                            ${licenseDays} Days
+                        </button>
+                    </div>
+                `;
+
+                // Update QR code display
+                const qrContainer = document.querySelector('#qr-code-container');
+                qrContainer.innerHTML = `
+                    <div style="text-align: center;">
+                        <img src="${result.qr_code}" alt="License QR Code" style="max-width: 270px; max-height: 270px; border: 2px solid #333; border-radius: 8px;">
+                        <p style="margin-top: 10px; font-size: 12px; color: #666;">License Key: ${result.license_key}</p>
+                        <button id="regenerate-qr-btn" style="background-color: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; margin-top: 15px;" onclick="regenerateLicense()">
+                            <i class="fa fa-refresh"></i> Regenerate
+                        </button>
+                    </div>
+                `;
+
+                console.log('✅ License QR display updated');
+            } else {
+                console.error('❌ License QR generation failed:', result.message);
+                alert('Failed to generate license QR code: ' + result.message);
+            }
+        } catch (error) {
+            console.error('❌ License QR generation error:', error);
+            alert('Error generating license QR code. Please check the console for details.');
+        }
+    }
+
+    function regenerateLicense() {
+        console.log('🔄 Regenerating license QR code');
+
+        if (currentLicenseDays) {
+            generateLicenseQR(currentLicenseDays);
+        } else {
+            console.error('❌ No license duration selected for regeneration');
+            alert('No license selected. Please select a license duration first.');
+        }
+    }
+
+    function backToLicenseSelection() {
+        console.log('⬅️ Returning to license selection');
+
+        // Hide QR display and show license selection
+        document.querySelector('#license-qr-display').style.display = 'none';
+        document.querySelector('#license-selection').style.display = 'block';
+    }
+
+    // Setup license selection buttons when system info panel is shown
+    function setupLicenseSelection() {
+        console.log('🔧 Setting up license selection buttons');
+
+        const license183Btn = document.querySelector('#license-183-btn');
+        const license366Btn = document.querySelector('#license-366-btn');
+
+        if (license183Btn) {
+            license183Btn.onclick = function() {
+                selectLicense(183);
+            };
+        }
+
+        if (license366Btn) {
+            license366Btn.onclick = function() {
+                selectLicense(366);
+            };
+        }
+    }
+
+    // APK Connection Status Monitoring
+    let apkConnectionInterval = null;
+
+    function startAPKConnectionMonitoring() {
+        console.log('📡 Starting APK connection status monitoring...');
+
+        // Update immediately
+        updateAPKConnectionStatus();
+
+        // Update every 5 seconds
+        apkConnectionInterval = setInterval(updateAPKConnectionStatus, 5000);
+    }
+
+    async function updateAPKConnectionStatus() {
+        try {
+            console.log('📡 Checking APK connection status...');
+
+            // Get current device ID if available
+            const deviceId = currentDeviceId || 'unknown';
+
+            const response = await fetch(`/apk_connection_status?device_id=${deviceId}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (!response.ok) {
+                console.error('❌ APK connection status check failed:', response.status);
+                setConnectionStatus(false, 'Connection failed');
+                return;
+            }
+
+            const result = await response.json();
+            console.log('📡 APK connection status result:', result);
+
+            if (result.status === 'success') {
+                const isConnected = result.connected;
+                const lastSeen = result.last_seen;
+                const timeDiff = result.time_diff_seconds;
+
+                // Update connection status display
+                if (isConnected) {
+                    setConnectionStatus(true, 'Connected');
+                    console.log('✅ APK is connected');
+                } else {
+                    let statusText = 'Not Connected';
+                    if (lastSeen) {
+                        const lastSeenDate = new Date(lastSeen);
+                        const now = new Date();
+                        const diffMinutes = Math.floor((now - lastSeenDate) / (1000 * 60));
+
+                        if (diffMinutes < 60) {
+                            statusText = `Last seen ${diffMinutes}m ago`;
+                        } else {
+                            const diffHours = Math.floor(diffMinutes / 60);
+                            statusText = `Last seen ${diffHours}h ago`;
+                        }
+                    }
+                    setConnectionStatus(false, statusText);
+                    console.log('❌ APK is not connected:', statusText);
+                }
+            } else {
+                console.error('❌ APK connection status check returned error:', result.message);
+                setConnectionStatus(false, 'Check failed');
+            }
+
+        } catch (error) {
+            console.error('❌ APK connection status check error:', error);
+            setConnectionStatus(false, 'Error');
+        }
+    }
+
+    function setConnectionStatus(isConnected, statusText) {
+        const connectionDot = document.querySelector('#connection-dot');
+        const connectionText = document.querySelector('#connection-text');
+
+        if (connectionDot) {
+            connectionDot.style.backgroundColor = isConnected ? '#28a745' : '#ffc107';
+            connectionDot.style.animation = isConnected ? 'none' : 'pulse 2s infinite';
+        }
+
+        if (connectionText) {
+            connectionText.textContent = statusText;
+            connectionText.style.color = isConnected ? '#28a745' : '#666';
+        }
+    }
+
+    // Initialize APK connection monitoring when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        // ... existing code ...
+
+        // Start APK connection monitoring
+        startAPKConnectionMonitoring();
+    });
+
     // Make functions globally available for testing
     window.forceExpiry = forceExpiry;
     window.resetToFirstTime = resetToFirstTime;
+    window.playSampleMedia = playSampleMedia;
+    window.pauseSampleMedia = pauseSampleMedia;
+    window.testMediaPlayer = testMediaPlayer;
+    window.selectLicense = selectLicense;
+    window.backToLicenseSelection = backToLicenseSelection;
+    window.startAPKConnectionMonitoring = startAPKConnectionMonitoring;
+    window.updateAPKConnectionStatus = updateAPKConnectionStatus;
 </script>
 {% endblock content %}
