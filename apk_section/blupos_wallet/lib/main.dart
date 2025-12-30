@@ -91,7 +91,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   String _accountIdDisplay = 'Not Activated';
   int _checkCounter = 0;
   bool _isSyncing = false;
-  
+
+
+
   // Network discovery service
   final NetworkDiscoveryService _networkDiscovery = NetworkDiscoveryService();
   late StreamSubscription<List<DiscoveredServer>> _discoverySubscription;
@@ -99,7 +101,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    
+
     _startNetworkDiscovery();
     _loadAppState();
   }
@@ -110,6 +112,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     _networkDiscovery.stopDiscovery();
     super.dispose();
   }
+
+
 
   // Start network discovery and listen for discovered servers
   void _startNetworkDiscovery() {
@@ -711,6 +715,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
 
+
+
   // Build the main view with Reports, 4 payments, and Share
   Widget _buildMainView() {
     return Column(
@@ -1081,7 +1087,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       },
                     ),
 
-                    const SizedBox(height: 24),
+
+
+                    const SizedBox(height: 16),
 
                     // Bottom Row: License Status and Expiry (hide expiry for expired state)
                     Row(

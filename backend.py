@@ -1011,88 +1011,9 @@ def get_items_report():
     """Get comprehensive items report for APK interface display"""
     # Allow access for APK interface without session authentication
     # This endpoint is for APK data display, not web interface
-    query = is_active()  # Define query variable for both branches
-    try:
-        # Check if request wants HTML for iframe display
-        if request.args.get('format') == 'html':
-            # Get all items with stock information
-            items = SaleItem.query.all()
-            stock_data = {}
-            for stock in SaleItemStockCount.query.all():
-                stock_data[stock.item_uid] = stock
 
-            # Calculate sales data per item
-            sales_data = {}
-            transactions = SaleItemTransaction.query.all()
-            for transaction in transactions:
-                uid = transaction.item_uid
-                if uid not in sales_data:
-                    sales_data[uid] = 0
-                sales_data[uid] += transaction.transaction_quantity
-
-            # Build items report
-            items_report = []
-            total_value = 0
-            total_items = 0
-            low_stock_count = 0
-
-            for item in items:
-                stock = stock_data.get(item.uid)
-                units_sold = sales_data.get(item.uid, 0)
-                current_stock = stock.current_stock_count if stock else 0
-                restock_value = stock.re_stock_value if stock else 0
-                item_value = current_stock * item.price
-
-                total_value += item_value
-                total_items += 1
-                if current_stock < restock_value:
-                    low_stock_count += 1
-
-                items_report.append({
-                    "name": item.name,
-                    "upc_code": item.uid,
-                    "current_stock": current_stock,
-                    "restock_value": restock_value,
-                    "price": float(item.price),
-                    "item_value": float(item_value),
-                    "units_sold": units_sold,
-                    "item_type": item.item_type,
-                    "low_stock": current_stock < restock_value
-                })
-
-            # Sales summary by clerk
-            clerk_sales = {}
-            for record in SaleRecord.query.all():
-                clerk = record.sale_clerk
-                if clerk not in clerk_sales:
-                    clerk_sales[clerk] = {"transactions": 0, "total_sales": 0.0}
-                clerk_sales[clerk]["transactions"] += 1
-                clerk_sales[clerk]["total_sales"] += record.sale_total
-
-            shop_data = load_shop_data()
-            user_name = user_from_session()
-
-            response = make_response(render_template(
-                'items_report_html.html',
-                is_active=True,
-                title="Items Report",
-                flash_message=False,
-                flash_payload="",
-                user_type=query['middleware'],
-                user_name=user_name,
-                shop_data=[shop_data],
-                items=items_report[:500],  # Limit to 500 items for display
-                summary={
-                    "total_items": total_items,
-                    "total_value": float(total_value),
-                    "low_stock_count": low_stock_count,
-                    "clerk_sales": clerk_sales
-                },
-                datetime=datetime
-            ))
-            return response
-
-        # Generate PDF directly in landscape A4 format
+    # Check if request wants HTML for iframe display
+    if request.args.get('format') == 'html':
         # Get all items with stock information
         items = SaleItem.query.all()
         stock_data = {}
@@ -1150,145 +1071,310 @@ def get_items_report():
         shop_data = load_shop_data()
         user_name = user_from_session()
 
-        # Create PDF buffer for landscape A4
-        pdf_buffer = BytesIO()
+        response = make_response(render_template(
+            'items_report_html.html',
+            is_active=True,
+            title="Items Report",
+            flash_message=False,
+            flash_payload="",
+            user_type='APK',
+            user_name=user_name,
+            shop_data=[shop_data],
+            items=items_report[:500],  # Limit to 500 items for display
+            summary={
+                "total_items": total_items,
+                "total_value": float(total_value),
+                "low_stock_count": low_stock_count,
+                "clerk_sales": clerk_sales
+            },
+            datetime=datetime
+        ))
+        return response
 
-        # Landscape A4 format
-        from reportlab.lib.pagesizes import A4, landscape
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
-        from reportlab.lib import colors
-        from reportlab.lib.units import inch
+    # Generate PDF directly in landscape A4 format
+    try:
+        print("Starting PDF generation data preparation...")
+        # Get all items with stock information
+        items = SaleItem.query.all()
+        print(f"Found {len(items)} items")
+        stock_data = {}
+        for stock in SaleItemStockCount.query.all():
+            stock_data[stock.item_uid] = stock
 
-        doc = SimpleDocTemplate(pdf_buffer, pagesize=landscape(A4),
-                               leftMargin=0.5*inch, rightMargin=0.5*inch,
-                               topMargin=0.5*inch, bottomMargin=0.5*inch)
-        styles = getSampleStyleSheet()
+        # Calculate sales data per item
+        sales_data = {}
+        transactions = SaleItemTransaction.query.all()
+        for transaction in transactions:
+            uid = transaction.item_uid
+            if uid not in sales_data:
+                sales_data[uid] = 0
+            sales_data[uid] += transaction.transaction_quantity
 
-        # Custom styles for items report
-        title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=16, alignment=1, spaceAfter=20)
-        subtitle_style = ParagraphStyle('Subtitle', parent=styles['Heading2'], fontSize=14, alignment=1, spaceAfter=15)
-        normal_style = ParagraphStyle('Normal', parent=styles['Normal'], fontSize=10, leading=12)
-        center_style = ParagraphStyle('Center', parent=styles['Normal'], fontSize=10, alignment=1, spaceAfter=10)
+        # Build items report
+        items_report = []
+        total_value = 0
+        total_items = 0
+        low_stock_count = 0
 
-        story = []
+        for item in items:
+            stock = stock_data.get(item.uid)
+            units_sold = sales_data.get(item.uid, 0)
+            current_stock = stock.current_stock_count if stock else 0
+            restock_value = stock.re_stock_value if stock else 0
+            item_value = current_stock * item.price
 
-        # Header
-        story.append(Paragraph(shop_data['pos_shop_name'], title_style))
-        story.append(Paragraph(f"Address: {shop_data['shop_adress']} | Tel: {shop_data['pos_shop_call_number']}", center_style))
-        story.append(Paragraph("ITEMS INVENTORY REPORT", subtitle_style))
-        story.append(Paragraph(f"Generated by: {user_name['user_name']} | Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", center_style))
-        story.append(Spacer(1, 20))
+            total_value += item_value
+            total_items += 1
+            if current_stock < restock_value:
+                low_stock_count += 1
 
-        # Inventory Summary
-        story.append(Paragraph("INVENTORY SUMMARY", subtitle_style))
+            items_report.append({
+                "name": item.name,
+                "upc_code": item.uid,
+                "current_stock": current_stock,
+                "restock_value": restock_value,
+                "price": float(item.price),
+                "item_value": float(item_value),
+                "units_sold": units_sold,
+                "item_type": item.item_type,
+                "low_stock": current_stock < restock_value
+            })
 
-        # Format numbers with commas and decimals
-        def format_currency(amount):
-            return f"KES {amount:,.2f}"
+        # Sales summary by clerk
+        clerk_sales = {}
+        for record in SaleRecord.query.all():
+            clerk = record.sale_clerk
+            if clerk not in clerk_sales:
+                clerk_sales[clerk] = {"transactions": 0, "total_sales": 0.0}
+            clerk_sales[clerk]["transactions"] += 1
+            clerk_sales[clerk]["total_sales"] += record.sale_total
 
-        # Summary table
-        summary_data = [
-            ['Total Items', 'Total Inventory Value', 'Low Stock Items', 'Items Sold Today'],
-            [str(total_items), format_currency(total_value), str(low_stock_count), str(sum(item['units_sold'] for item in items_report))]
-        ]
+        try:
+            print("Loading shop data and user info...")
+            shop_data = load_shop_data()
+            print(f"Shop data loaded: {shop_data}")
 
-        summary_table = Table(summary_data, colWidths=[2*inch, 2*inch, 2*inch, 2*inch])
-        summary_table.setStyle(TableStyle([
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('FONTNAME', (0, 0), (-1, 0), 'Courier-Bold'),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('LEFTPADDING', (0, 0), (-1, -1), 5),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 5),
-            ('TOPPADDING', (0, 0), (-1, -1), 5),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ]))
-        story.append(summary_table)
-        story.append(Spacer(1, 15))
+            # Handle session gracefully for APK requests
+            try:
+                user_name = user_from_session()
+                print(f"User name: {user_name}")
+            except:
+                # Default user info for APK requests
+                user_name = {"user_name": "APK User"}
+                print("Using default APK user info")
 
-        # Sales by clerk summary
-        if clerk_sales:
-            story.append(Paragraph("SALES SUMMARY BY CLERK", styles['Heading3']))
-            clerk_data = [['Clerk Name', 'Total Transactions', 'Total Sales Amount']]
-            for clerk, data in clerk_sales.items():
-                clerk_data.append([clerk, str(data['transactions']), format_currency(data['total_sales'])])
+            # Test ReportLab imports
+            print("Testing ReportLab imports...")
+            try:
+                from reportlab.lib.pagesizes import A4, landscape
+                from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+                from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+                from reportlab.lib import colors
+                from reportlab.lib.units import inch
+                print("ReportLab imports successful")
+            except Exception as e:
+                print(f"ReportLab import error: {e}")
+                raise
 
-            clerk_table = Table(clerk_data, colWidths=[2.5*inch, 2*inch, 2*inch])
-            clerk_table.setStyle(TableStyle([
-                ('FONTSIZE', (0, 0), (-1, -1), 9),
+            # Create PDF buffer for landscape A4
+            pdf_buffer = BytesIO()
+
+            print("Creating SimpleDocTemplate...")
+            try:
+                doc = SimpleDocTemplate(pdf_buffer, pagesize=landscape(A4),
+                                       leftMargin=0.5*inch, rightMargin=0.5*inch,
+                                       topMargin=0.5*inch, bottomMargin=0.5*inch)
+                print("SimpleDocTemplate created successfully")
+            except Exception as e:
+                print(f"Error creating SimpleDocTemplate: {e}")
+                raise
+
+            print("Getting sample style sheet...")
+            try:
+                styles = getSampleStyleSheet()
+                print(f"Sample style sheet obtained: {type(styles)}")
+                print(f"Available styles: {list(styles.keys()) if hasattr(styles, 'keys') else 'Not a dict'}")
+            except Exception as e:
+                print(f"Error getting sample style sheet: {e}")
+                raise
+
+            # Custom styles for items report
+            print("Creating ReportLab styles...")
+            try:
+                # Check what styles are available in the StyleSheet1 object
+                print(f"Available styles in StyleSheet1: {list(styles.byName.keys())}")
+                
+                # Use the available styles from StyleSheet1
+                title_style = ParagraphStyle('Title', parent=styles['Title'], fontSize=16, alignment=1, spaceAfter=20)
+                subtitle_style = ParagraphStyle('Subtitle', parent=styles['Heading2'], fontSize=14, alignment=1, spaceAfter=15)
+                normal_style = ParagraphStyle('Normal', parent=styles['Normal'], fontSize=10, leading=12)
+                center_style = ParagraphStyle('Center', parent=styles['Normal'], fontSize=10, alignment=1, spaceAfter=10)
+                print("ReportLab styles created successfully")
+            except Exception as e:
+                print(f"Error creating ReportLab styles: {e}")
+                print(f"Available styles: {list(styles.byName.keys()) if hasattr(styles, 'byName') else 'No byName attribute'}")
+                raise
+
+            story = []
+
+            # Header
+            print("Creating PDF header...")
+            try:
+                story.append(Paragraph(shop_data['pos_shop_name'], title_style))
+                story.append(Paragraph(f"Address: {shop_data['shop_adress']} | Tel: {shop_data['pos_shop_call_number']}", center_style))
+                story.append(Paragraph("ITEMS INVENTORY REPORT", subtitle_style))
+                story.append(Paragraph(f"Generated by: {user_name['user_name']} | Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", center_style))
+                story.append(Spacer(1, 20))
+                print("PDF header created successfully")
+            except Exception as e:
+                print(f"Error creating PDF header: {e}")
+                raise
+
+            # Inventory Summary
+            story.append(Paragraph("INVENTORY SUMMARY", subtitle_style))
+
+            # Format numbers with commas and decimals
+            def format_currency(amount):
+                return f"KES {amount:,.2f}"
+
+            # Debug summary data
+            try:
+                total_sold = sum(item['units_sold'] for item in items_report)
+                print(f"Summary data: total_items={total_items}, total_value={total_value}, low_stock_count={low_stock_count}, total_sold={total_sold}")
+            except Exception as e:
+                print(f"Error calculating summary: {e}")
+                raise
+
+            # Summary table
+            summary_data = [
+                ['Total Items', 'Total Inventory Value', 'Low Stock Items', 'Items Sold Today'],
+                [str(total_items), format_currency(total_value), str(low_stock_count), str(sum(item['units_sold'] for item in items_report))]
+            ]
+
+            summary_table = Table(summary_data, colWidths=[2*inch, 2*inch, 2*inch, 2*inch])
+            summary_table.setStyle(TableStyle([
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
                 ('FONTNAME', (0, 0), (-1, 0), 'Courier-Bold'),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                 ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('LEFTPADDING', (0, 0), (-1, -1), 3),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 3),
-                ('TOPPADDING', (0, 0), (-1, -1), 3),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+                ('LEFTPADDING', (0, 0), (-1, -1), 5),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+                ('TOPPADDING', (0, 0), (-1, -1), 5),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
             ]))
-            story.append(clerk_table)
-            story.append(Spacer(1, 20))
+            story.append(summary_table)
+            story.append(Spacer(1, 15))
 
-        # Page break before detailed items
-        story.append(PageBreak())
+            # Sales by clerk summary
+            if clerk_sales:
+                story.append(Paragraph("SALES SUMMARY BY CLERK", styles['Heading3']))
+                clerk_data = [['Clerk Name', 'Total Transactions', 'Total Sales Amount']]
+                for clerk, data in clerk_sales.items():
+                    clerk_data.append([clerk, str(data['transactions']), format_currency(data['total_sales'])])
 
-        # Detailed Items
-        story.append(Paragraph("DETAILED ITEMS INVENTORY", subtitle_style))
+                clerk_table = Table(clerk_data, colWidths=[2.5*inch, 2*inch, 2*inch])
+                clerk_table.setStyle(TableStyle([
+                    ('FONTSIZE', (0, 0), (-1, -1), 9),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Courier-Bold'),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 3),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 3),
+                    ('TOPPADDING', (0, 0), (-1, -1), 3),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+                ]))
+                story.append(clerk_table)
+                story.append(Spacer(1, 20))
 
-        # Items table header
-        items_data = [['Item Name', 'UPC Code', 'Current Stock', 'Restock Level', 'Unit Price', 'Inventory Value', 'Units Sold', 'Item Type']]
+            # Page break before detailed items
+            story.append(PageBreak())
 
-        # Add items (limit to avoid huge PDF)
-        for item in items_report[:500]:  # Limit to 500 items to keep PDF manageable
-            items_data.append([
-                item['name'][:25] + '...' if len(item['name']) > 25 else item['name'],  # Truncate long names
-                item['upc_code'],
-                str(item['current_stock']),
-                str(item['restock_value']),
-                format_currency(item['price']),
-                format_currency(item['item_value']),
-                str(item['units_sold']),
-                item['item_type']
-            ])
+            # Detailed Items
+            story.append(Paragraph("DETAILED ITEMS INVENTORY", subtitle_style))
 
-        # Create table with multiple rows per page
-        items_table = Table(items_data, colWidths=[1.5*inch, 1.2*inch, 0.8*inch, 0.8*inch, 1*inch, 1.2*inch, 0.8*inch, 1*inch])
-        items_table.setStyle(TableStyle([
-            ('FONTSIZE', (0, 0), (-1, -1), 7),
-            ('FONTNAME', (0, 0), (-1, 0), 'Courier-Bold'),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-            ('LEFTPADDING', (0, 0), (-1, -1), 2),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 2),
-            ('TOPPADDING', (0, 0), (-1, -1), 2),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-        ]))
-        story.append(items_table)
+            # Items table header
+            items_data = [['Item Name', 'UPC Code', 'Current Stock', 'Restock Level', 'Unit Price', 'Inventory Value', 'Units Sold', 'Item Type']]
 
-        if len(items_report) > 500:
-            story.append(Spacer(1, 10))
-            story.append(Paragraph(f"* Showing first 500 of {len(items_report)} total items", center_style))
+            # Add items (limit to avoid huge PDF)
+            for item in items_report[:500]:  # Limit to 500 items to keep PDF manageable
+                try:
+                    row_data = [
+                        item['name'][:25] + '...' if len(item['name']) > 25 else item['name'],  # Truncate long names
+                        item['upc_code'],
+                        str(item['current_stock']),
+                        str(item['restock_value']),
+                        format_currency(item['price']),
+                        format_currency(item['item_value']),
+                        str(item['units_sold']),
+                        item['item_type']
+                    ]
+                    # Ensure all row data is valid (not None)
+                    row_data = [str(x) if x is not None else '' for x in row_data]
+                    items_data.append(row_data)
+                except (KeyError, TypeError) as e:
+                    print(f"Error processing item {item}: {e}")
+                    continue
 
-        # Build PDF
-        doc.build(story)
-        pdf_buffer.seek(0)
+            # Ensure we have at least the header
+            if len(items_data) <= 1:
+                # No items, add empty row to prevent table creation error
+                items_data.append(['No items found', '', '', '', '', '', '', ''])
 
-        print("Items inventory PDF generated successfully")
+            # Debug: Check data consistency
+            print(f"Items data length: {len(items_data)}")
+            if items_data:
+                header_len = len(items_data[0])
+                print(f"Header length: {header_len}")
+                for i, row in enumerate(items_data):
+                    if len(row) != header_len:
+                        print(f"Row {i} length mismatch: expected {header_len}, got {len(row)}")
+                        print(f"Row {i} content: {row}")
 
-        # Return as download that opens in print dialog
-        response = make_response(pdf_buffer.read())
-        response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = 'inline; filename=items_inventory_report.pdf'
-        return response
+            # Create table with multiple rows per page - ensure colWidths matches number of columns
+            expected_cols = len(items_data[0]) if items_data else 8
+            col_widths = [1.5*inch, 1.2*inch, 0.8*inch, 0.8*inch, 1*inch, 1.2*inch, 0.8*inch, 1*inch][:expected_cols]
+
+            print(f"Creating table with {len(items_data)} rows, {expected_cols} columns")
+            items_table = Table(items_data, colWidths=col_widths)
+            items_table.setStyle(TableStyle([
+                ('FONTSIZE', (0, 0), (-1, -1), 7),
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                ('LEFTPADDING', (0, 0), (-1, -1), 2),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 2),
+                ('TOPPADDING', (0, 0), (-1, -1), 2),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ]))
+            story.append(items_table)
+
+            if len(items_report) > 500:
+                story.append(Spacer(1, 10))
+                story.append(Paragraph(f"* Showing first 500 of {len(items_report)} total items", center_style))
+
+            # Build PDF
+            doc.build(story)
+            pdf_buffer.seek(0)
+
+            print("Items inventory PDF generated successfully")
+
+            # Return as download that opens in print dialog
+            response = make_response(pdf_buffer.read())
+            response.headers['Content-Type'] = 'application/pdf'
+            response.headers['Content-Disposition'] = 'inline; filename=items_inventory_report.pdf'
+            return response
+
+        except Exception as e:
+            print(f"Error in PDF generation: {e}")
+            raise
 
     except Exception as e:
         print(f"Error generating items report: {e}")
-        if request.args.get('format') == 'html':
-            return jsonify({"status": "error", "message": "Failed to generate items report"})
-        return redirect(query['middleware']['allowed_routes'][0])
+        return jsonify({"status": "error", "message": "Failed to generate items report"})
 
 @app.route('/get_sale_record_printout', methods=['GET'])
 def get_sale_record_printout():
