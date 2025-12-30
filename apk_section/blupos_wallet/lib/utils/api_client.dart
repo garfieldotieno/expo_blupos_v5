@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiClient {
   static const String baseUrl = 'http://localhost:5000'; // Default BluPOS URL
@@ -147,6 +148,74 @@ class ApiClient {
       return response['status'] == 'ok';
     } catch (e) {
       return false;
+    }
+  }
+
+  // Get saved backend URL from shared preferences
+  static Future<String> getBackendUrl() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('backend_url') ?? baseUrl;
+  }
+
+  // Save backend URL to shared preferences
+  static Future<void> saveBackendUrl(String url) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('backend_url', url);
+    setMasterUrl(url); // Also update the current session URL
+  }
+
+  // Test connection to a specific backend URL
+  static Future<Map<String, dynamic>> testConnectionToUrl(String backendUrl) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$backendUrl/health'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return {
+          'status': 'success',
+          'message': 'Connection successful',
+          'server_info': data
+        };
+      } else {
+        return {
+          'status': 'error',
+          'message': 'HTTP ${response.statusCode}: ${response.body}'
+        };
+      }
+    } catch (e) {
+      return {
+        'status': 'error',
+        'message': 'Connection failed: ${e.toString()}'
+      };
+    }
+  }
+
+  // Initialize backend URL from shared preferences on app start
+  static Future<void> initializeBackendUrl() async {
+    try {
+      final savedUrl = await getBackendUrl();
+      if (savedUrl != baseUrl) {
+        setMasterUrl(savedUrl);
+      }
+    } catch (e) {
+      print('Error initializing backend URL: $e');
+    }
+  }
+
+  // Update backend URL (for network discovery auto-connect)
+  static Future<void> updateBackendUrl(String url) async {
+    try {
+      await saveBackendUrl(url);
+      print('✅ Backend URL updated to: $url');
+    } catch (e) {
+      print('❌ Failed to update backend URL: $e');
+      rethrow;
     }
   }
 }

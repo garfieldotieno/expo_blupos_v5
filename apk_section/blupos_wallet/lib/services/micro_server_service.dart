@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:http/http.dart' as http;
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:shelf_router/shelf_router.dart';
@@ -122,20 +123,43 @@ class MicroServerService {
     };
   }
 
-  static Response _healthHandler(Request request) {
-    final response = {
-      'status': 'ok',
-      'timestamp': DateTime.now().toUtc().toIso8601String(),
-      'server': 'BluPOS Micro-Server',
-      'version': '1.0.0',
-      'port': PORT,
-    };
+  static Future<Response> _healthHandler(Request request) async {
+    try {
+      // Check BluPOS backend state automatically
+      final bluposState = await _checkBluPOSState();
 
-    print('🏥 Health check requested - ${DateTime.now()}');
-    return Response.ok(
-      jsonEncode(response),
-      headers: {'Content-Type': 'application/json'},
-    );
+      final response = {
+        'status': 'ok',
+        'timestamp': DateTime.now().toUtc().toIso8601String(),
+        'server': 'BluPOS Micro-Server',
+        'version': '1.0.0',
+        'port': PORT,
+        'blupos_sync': bluposState,
+      };
+
+      print('🏥 Health check requested - ${DateTime.now()} - BluPOS state: ${bluposState['app_state']}');
+      return Response.ok(
+        jsonEncode(response),
+        headers: {'Content-Type': 'application/json'},
+      );
+    } catch (e) {
+      print('❌ Health check error: $e');
+      return Response.ok(
+        jsonEncode({
+          'status': 'ok',
+          'timestamp': DateTime.now().toUtc().toIso8601String(),
+          'server': 'BluPOS Micro-Server',
+          'version': '1.0.0',
+          'port': PORT,
+          'blupos_sync': {
+            'status': 'error',
+            'error': e.toString(),
+            'app_state': 'unknown'
+          }
+        }),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
   }
 
   static Future<Response> _testHandler(Request request) async {
@@ -257,8 +281,8 @@ class MicroServerService {
         final codeData = _dummyActivationCodes[licenseType]!;
         final licenseDays = codeData['license_days'] as int;
 
-        // Update license with new expiry
-        final expiryDate = DateTime.now().add(Duration(days: licenseDays));
+        // Update license with new expiry - use UTC
+        final expiryDate = DateTime.now().toUtc().add(Duration(days: licenseDays));
         await prefs.setString('licenseExpiry', expiryDate.toIso8601String());
         await prefs.setBool('isActivated', true);
 
@@ -342,7 +366,7 @@ class MicroServerService {
         if (activationCode == 'BLUPOS2025') {
           // Set device as activated without going through activation process
           await prefs.setBool('isActivated', true);
-          final expiryDate = DateTime.now().add(const Duration(days: 30));
+          final expiryDate = DateTime.now().toUtc().add(const Duration(days: 30));
           await prefs.setString('licenseExpiry', expiryDate.toIso8601String());
           await prefs.setString('deviceId', deviceId);
           await prefs.setString('activationCode', activationCode);
@@ -364,9 +388,9 @@ class MicroServerService {
         final codeData = _dummyActivationCodes[activationCode]!;
         final licenseDays = codeData['license_days'] as int;
 
-        // Set activation status and license expiry
+        // Set activation status and license expiry - use UTC like backend
         await prefs.setBool('isActivated', true);
-        final expiryDate = DateTime.now().add(Duration(days: licenseDays));
+        final expiryDate = DateTime.now().toUtc().add(Duration(days: licenseDays));
         await prefs.setString('licenseExpiry', expiryDate.toIso8601String());
         await prefs.setString('deviceId', deviceId);
         await prefs.setString('activationCode', activationCode);
@@ -447,8 +471,8 @@ class MicroServerService {
           };
         }
 
-        // Extend license for another 30 days
-        final newExpiryDate = DateTime.now().add(const Duration(days: 30));
+        // Extend license for another 30 days - use UTC
+        final newExpiryDate = DateTime.now().toUtc().add(const Duration(days: 30));
         await prefs.setString('licenseExpiry', newExpiryDate.toIso8601String());
 
         print('🔄 License reactivated for device: $deviceId');
@@ -472,6 +496,46 @@ class MicroServerService {
   static bool _validateActivationCode(String code) {
     // Check against dummy activation codes for prototyping
     return _dummyActivationCodes.containsKey(code);
+  }
+
+  static Future<Map<String, dynamic>> _checkBluPOSState() async {
+    try {
+      // Use http package for simpler POST request to BluPOS backend
+      final url = Uri.parse('http://localhost:8080/activate');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'action': 'check_expiry'}),
+      );
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+
+      if (data['status'] == 'success') {
+        print('✅ BluPOS state synced: ${data['app_state']}');
+        return {
+          'status': 'success',
+          'app_state': data['app_state'],
+          'account_id': data['account_id'],
+          'license_expiry': data['license_expiry'],
+          'days_remaining': data['days_remaining'],
+          'license_type': data['license_type'],
+        };
+      } else {
+        print('⚠️ BluPOS state check failed: ${data['message']}');
+        return {
+          'status': 'error',
+          'app_state': 'unknown',
+          'error': data['message'],
+        };
+      }
+    } catch (e) {
+      print('❌ BluPOS connection failed: $e');
+      return {
+        'status': 'error',
+        'app_state': 'disconnected',
+        'error': e.toString(),
+      };
+    }
   }
 
   static Future<String> _getLocalIp() async {

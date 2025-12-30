@@ -423,3 +423,28 @@ input {
   transition: color 0.3s ease;
   font-weight: 500;
 }
+
+/* Reports Button Pulsing Animation */
+@keyframes reports-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(24, 42, 98, 0.7);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(24, 42, 98, 0);
+    transform: scale(1.02);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(24, 42, 98, 0);
+    transform: scale(1);
+  }
+}
+
+#report-btn.syncing {
+  animation: reports-pulse 1.5s infinite;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+#report-btn.syncing:hover {
+  animation-play-state: paused;
+}

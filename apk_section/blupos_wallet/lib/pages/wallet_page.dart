@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/wallet_service.dart';
+import '../utils/format_utils.dart';
 
 class WalletPage extends StatefulWidget {
   const WalletPage({super.key});
@@ -208,7 +209,7 @@ class _WalletPageState extends State<WalletPage> {
             children: [
               Text('ID: ${transaction['id']}'),
               Text('Description: ${transaction['description']}'),
-              Text('Amount: KES ${transaction['amount'].abs().toStringAsFixed(2)}'),
+              Text('Amount: ${FormatUtils.formatCurrencyKES(transaction['amount'].abs())}'),
               Text('Date: ${transaction['date']}'),
               Text('Status: ${transaction['status']}'),
             ],
@@ -298,7 +299,7 @@ class _WalletPageState extends State<WalletPage> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'KES ${_balance.toStringAsFixed(2)}',
+                        FormatUtils.formatCurrencyKES(_balance),
                         style: const TextStyle(
                           color: Colors.black,
                           fontSize: 28,
@@ -412,7 +413,7 @@ class _WalletPageState extends State<WalletPage> {
                             ),
                           ),
                           trailing: Text(
-                            '${isCredit ? '+' : ''}KES ${amount.abs().toStringAsFixed(2)}',
+                            FormatUtils.formatCurrencyWithSign(amount),
                             style: TextStyle(
                               color: isCredit ? Colors.green : Colors.red,
                               fontWeight: FontWeight.bold,

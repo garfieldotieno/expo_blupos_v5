@@ -231,7 +231,12 @@
                         <h5 class="text-center" style="color: #333; margin-bottom: 16px;"><b>Device Setup Required</b></h5>
                         <div style="text-align: center; color: #666; font-size: 14px;">
                             <p>Please activate your device to access all features.</p>
-                            <p style="margin-top: 20px;">Use the activation button on the left to get started.</p>
+                            <div style="margin-top: 20px;">
+                                <button id="generate-activation-qr-btn" style="background-color: #182A62; color: white; border: none; padding: 15px 30px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer;" onclick="generateActivationQR()">
+                                    Generate Activation QR Code
+                                </button>
+                            </div>
+                            <p style="margin-top: 15px; font-size: 12px;">Click to generate a QR code that can be scanned by the BluPOS APK for activation.</p>
                         </div>
                     </div>
                 </div>
@@ -847,6 +852,12 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             console.log('🔍 Checking backend state...');
 
+            // Add pulsing animation to Reports button during sync
+            const reportBtn = document.querySelector('#report-btn');
+            if (reportBtn) {
+                reportBtn.classList.add('syncing');
+            }
+
             // First, check if we have a device ID to query
             if (!currentDeviceId) {
                 // Try to get device ID from localStorage or generate one
@@ -868,6 +879,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (!statusResponse.ok) {
                 console.error('❌ Backend state check failed:', statusResponse.status);
+                // Remove pulsing animation on error
+                if (reportBtn) {
+                    reportBtn.classList.remove('syncing');
+                }
                 return;
             }
 
@@ -883,8 +898,18 @@ document.addEventListener('DOMContentLoaded', function() {
             // Update UI based on backend response
             updateUIFromBackend(statusResult);
 
+            // Remove pulsing animation after sync completes
+            if (reportBtn) {
+                reportBtn.classList.remove('syncing');
+            }
+
         } catch (error) {
             console.error('❌ Backend state check error:', error);
+            // Remove pulsing animation on error
+            const reportBtn = document.querySelector('#report-btn');
+            if (reportBtn) {
+                reportBtn.classList.remove('syncing');
+            }
         }
     }
 
@@ -1098,10 +1123,13 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        // Store current device ID if available
-        if (backendState.device_id && backendState.device_id !== 'unknown') {
+        // Store current account ID if available
+        if (backendState.account_id) {
+            currentDeviceId = backendState.account_id;
+            console.log('🆔 Updated current account ID:', currentDeviceId);
+        } else if (backendState.device_id && backendState.device_id !== 'unknown') {
             currentDeviceId = backendState.device_id;
-            console.log('🆔 Updated current device ID:', currentDeviceId);
+            console.log('🆔 Updated current device ID (fallback):', currentDeviceId);
         }
     }
 
@@ -1114,25 +1142,48 @@ document.addEventListener('DOMContentLoaded', function() {
         // Show/hide appropriate card sections based on state
         showCardSection(isFirstTime, isActivated, isExpired);
 
-        // Update device ID display (top-left) - show numerals only
+        // Update device ID display (top-left) - show account_id numerals
         const deviceIdElement = document.querySelector('#device-id-display');
         if (deviceIdElement) {
             let deviceDisplay = '--';
-            if (currentDeviceId && currentDeviceId.startsWith('device_')) {
-                // Extract numerals after 'device_'
-                deviceDisplay = currentDeviceId.replace('device_', '');
-                console.log('🧮 Extracted device numerals:', deviceDisplay, 'from:', currentDeviceId);
+            if (currentDeviceId && currentDeviceId.startsWith('account_')) {
+                // Extract numerals after 'account_'
+                deviceDisplay = currentDeviceId.replace('account_', '');
+                console.log('🧮 Extracted account numerals:', deviceDisplay, 'from:', currentDeviceId);
+            } else if (currentDeviceId) {
+                // Fallback: if it doesn't start with 'account_', show the full ID
+                deviceDisplay = currentDeviceId;
+                console.log('⚠️ Using full device ID for display:', currentDeviceId);
             } else {
-                console.log('⚠️ No valid device ID for display:', currentDeviceId);
+                console.log('⚠️ No device ID available for display');
             }
+
             console.log('🆔 Setting device ID display to:', deviceDisplay);
+
+            // Update the element content
             deviceIdElement.textContent = deviceDisplay;
+            deviceIdElement.innerText = deviceDisplay; // Also try innerText for compatibility
 
             // Force a visual update check
             console.log('🔍 Element content after update:', deviceIdElement.textContent);
+            console.log('🔍 Element innerText after update:', deviceIdElement.innerText);
+
+            // Add visual debugging - make the element more visible temporarily
+            deviceIdElement.style.backgroundColor = '#ffff99';
+            deviceIdElement.style.padding = '4px';
+            deviceIdElement.style.border = '2px solid #ff0000';
+
+            // Remove debugging styles after 5 seconds
+            setTimeout(() => {
+                deviceIdElement.style.backgroundColor = '';
+                deviceIdElement.style.padding = '';
+                deviceIdElement.style.border = '';
+            }, 5000);
+
         } else {
             console.error('❌ Device ID display element not found in DOM');
             console.log('🔍 Available elements with "device" in ID:', Array.from(document.querySelectorAll('[id*="device"]')).map(el => el.id));
+            console.log('🔍 All elements with ID containing "id":', Array.from(document.querySelectorAll('[id*="id"]')).map(el => el.id));
         }
 
         // Update license status
@@ -2267,7 +2318,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     license_days: licenseDays,
-                    device_id: currentDeviceId || 'unknown'
+                    account_id: currentDeviceId || 'unknown'  // Changed from device_id to account_id
                 })
             });
 
@@ -2315,6 +2366,64 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             console.error('❌ License QR generation error:', error);
             alert('Error generating license QR code. Please check the console for details.');
+        }
+    }
+
+    // Activation QR generation for APK activation (first-time activation)
+    async function generateActivationQR() {
+        try {
+            console.log('🚀 Generating activation QR code for APK...');
+
+            const response = await fetch('/generate_activation_qr', {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (!response.ok) {
+                console.error('❌ Failed to generate activation QR:', response.status);
+                alert('Failed to generate activation QR code. Please try again.');
+                return;
+            }
+
+            const result = await response.json();
+            console.log('📱 Activation QR generated:', result);
+
+            if (result.status === 'success') {
+                // Hide default setup message and show QR display
+                document.querySelector('#default-setup-message').style.display = 'none';
+                document.querySelector('#license-qr-display').style.display = 'block';
+
+                // Update selected license info for activation
+                const selectedInfo = document.querySelector('#selected-license-info');
+                selectedInfo.innerHTML = `
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <button style="background-color: #182A62; color: white; border: none; padding: 15px 25px; border-radius: 8px; font-size: 16px; font-weight: 600; min-width: 120px; cursor: default;">
+                            First-Time Activation
+                        </button>
+                    </div>
+                `;
+
+                // Update QR code display for activation
+                const qrContainer = document.querySelector('#qr-code-container');
+                qrContainer.innerHTML = `
+                    <div style="text-align: center;">
+                        <img src="${result.qr_code}" alt="Activation QR Code" style="max-width: 270px; max-height: 270px; border: 2px solid #333; border-radius: 8px;">
+                        <p style="margin-top: 10px; font-size: 14px; font-weight: bold; color: #333;">Activation Code: ${result.activation_code}</p>
+                        <p style="margin-top: 5px; font-size: 12px; color: #666;">Scan this QR code with the BluPOS APK to activate your device</p>
+                        <button id="regenerate-activation-qr-btn" style="background-color: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; margin-top: 15px;" onclick="generateActivationQR()">
+                            <i class="fa fa-refresh"></i> Generate New Code
+                        </button>
+                    </div>
+                `;
+
+                console.log('✅ Activation QR display updated');
+            } else {
+                console.error('❌ Activation QR generation failed:', result.message);
+                alert('Failed to generate activation QR code: ' + result.message);
+            }
+        } catch (error) {
+            console.error('❌ Activation QR generation error:', error);
+            alert('Error generating activation QR code. Please check the console for details.');
         }
     }
 

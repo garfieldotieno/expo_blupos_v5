@@ -184,4 +184,34 @@ class ActivationService {
       };
     }
   }
+
+  // Send heartbeat to web system
+  static Future<Map<String, dynamic>> sendHeartbeat({
+    required String accountId,
+    required String licenseKey,
+    int batteryLevel = 100,
+    String networkType = 'WIFI',
+  }) async {
+    final heartbeatData = {
+      'account_id': accountId,
+      'license_key': licenseKey,
+      'timestamp': DateTime.now().toIso8601String(),
+      'battery_level': batteryLevel,
+      'network_type': networkType,
+    };
+
+    try {
+      final response = await ApiClient.post('/heartbeat', heartbeatData);
+      return {
+        'success': true,
+        'message': 'Heartbeat sent successfully',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'error': e.toString(),
+        'message': 'Failed to send heartbeat',
+      };
+    }
+  }
 }

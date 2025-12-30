@@ -1,5 +1,7 @@
 from enum import unique
 import json
+import hashlib
+import hmac
 from flask import Flask, render_template, request, abort, redirect, make_response, url_for, session, send_file, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta, timezone
@@ -8,6 +10,10 @@ import string, random
 from flask_sqlalchemy import SQLAlchemy
 import time
 from flask_cors import CORS
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives import padding
+from cryptography.hazmat.backends import default_backend
+import base64
 
 from reportlab.lib.pagesizes import landscape, letter
 from reportlab.lib import colors
@@ -19,6 +25,24 @@ import pydantic
 import yaml
 import hashlib
 
+# Import network discovery broadcast service
+try:
+    from backend_broadcast_service import start_backend_broadcast, stop_backend_broadcast
+    BROADCAST_AVAILABLE = True
+except ImportError:
+    print("⚠️ Network discovery broadcast service not available")
+    BROADCAST_AVAILABLE = False
+
+# Secure network discovery broadcasting
+import socket
+import threading
+import time
+import json
+import hashlib
+import hmac
+import base64
+from datetime import datetime, timezone
+
 from xhtml2pdf import pisa
 import qrcode
 import base64
@@ -27,7 +51,21 @@ __version__ = "1.0.0"
 
 app = Flask(__name__)
 app.secret_key = b"Z'(\xac\xe1\xb3$\xb1\x8e\xea,\x06b\xb8\x0b\xc0"
-CORS(app)
+# Configure CORS for all routes with specific settings
+CORS(app, resources={
+    r"/health": {"origins": "*"},
+    r"/activate": {"origins": "*"},
+    r"/test": {"origins": "*"},
+    r"/generate_activation_qr": {"origins": "*"},
+    r"/generate_license_qr": {"origins": "*"},
+    r"/validate_license": {"origins": "*"},
+    r"/heartbeat": {"origins": "*"},
+    r"/apk_connection_status": {"origins": "*"},
+    r"/get_latest_payments": {"origins": "*"},
+    r"/get_total_sales": {"origins": "*"},
+    r"/get_sale_record_printout": {"origins": "*"},
+    r"/get_items_report": {"origins": "*"},
+})
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///pos_test.db'
 db = SQLAlchemy(app)
@@ -86,20 +124,20 @@ def reset_session():
     return {"status":True, "middleware":session_middleware['Anonymous']}         
 
 
-class Device(db.Model):
+class Account(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    device_id = db.Column(db.String(20), unique=True, nullable=False)
-    device_name = db.Column(db.String(50), nullable=True)
-    device_type = db.Column(db.String(20), default='web')  # 'web', 'mobile', etc.
+    account_id = db.Column(db.String(20), unique=True, nullable=False)
+    account_name = db.Column(db.String(50), nullable=True)
+    account_type = db.Column(db.String(20), default='web')  # 'web', 'mobile', etc.
     created_at = db.Column(db.DateTime, default=datetime.now())
     last_seen = db.Column(db.DateTime, default=datetime.now())
 
     def __repr__(self):
-        return f"Device(id={self.id}, device_id='{self.device_id}', device_name='{self.device_name}', device_type='{self.device_type}', created_at={self.created_at}, last_seen={self.last_seen})"
+        return f"Account(id={self.id}, account_id='{self.account_id}', account_name='{self.account_name}', account_type='{self.account_type}', created_at={self.created_at}, last_seen={self.last_seen})"
 
 class License(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    device_id = db.Column(db.String(20), db.ForeignKey('device.device_id'), nullable=False)
+    account_id = db.Column(db.String(20), db.ForeignKey('account.account_id'), nullable=False)
     uid = db.Column(db.String(10), unique=True, nullable=False)
     license_key = db.Column(db.String(20), unique=True, nullable=False)
     license_type = db.Column(db.String(10), nullable=False)
@@ -109,35 +147,80 @@ class License(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.now())
 
     def __repr__(self):
-        return f"License(id={self.id}, device_id='{self.device_id}', uid='{self.uid}', license_key='{self.license_key}', license_type='{self.license_type}', license_status='{self.license_status}', license_expiry='{self.license_expiry}', created_at={self.created_at}, updated_at={self.updated_at})"
+        return f"License(id={self.id}, account_id='{self.account_id}', uid='{self.uid}', license_key='{self.license_key}', license_type='{self.license_type}', license_status='{self.license_status}', license_expiry='{self.license_expiry}', created_at={self.created_at}, updated_at={self.updated_at})"
 
 # Create all database tables on app startup
 with app.app_context():
+    # Clear SQLAlchemy metadata cache and reflect database schema
+    db.metadata.clear()
+
+    # Force recreate all tables to ensure schema is up to date
+    print("🔄 Recreating all database tables...")
     db.create_all()
+
+    # Verify account_id column exists and populate it if needed
+    with db.engine.connect() as conn:
+        # Check if account_id column exists
+        result = conn.execute(db.text("PRAGMA table_info(license)"))
+        columns = result.fetchall()
+        column_names = [col[1] for col in columns]
+
+        if 'account_id' not in column_names:
+            print("➕ Adding account_id column to license table...")
+            conn.execute(db.text("ALTER TABLE license ADD COLUMN account_id VARCHAR(20)"))
+            conn.commit()
+
+        # Copy device_id to account_id where account_id is NULL
+        conn.execute(db.text("UPDATE license SET account_id = device_id WHERE account_id IS NULL"))
+        conn.commit()
+
+        print(f"📊 License table columns: {column_names}")
+
+        # Check if Account table exists and has data
+        result = conn.execute(db.text("SELECT COUNT(*) FROM account"))
+        account_count = result.fetchone()[0]
+
+        if account_count == 0:
+            print("🏗️ Creating default account...")
+            # Get existing device_id from license table
+            result = conn.execute(db.text("SELECT DISTINCT device_id FROM license WHERE device_id IS NOT NULL LIMIT 1"))
+            device_result = result.fetchone()
+
+            if device_result:
+                account_id = f"account_{device_result[0]}"
+            else:
+                # Generate a proper account ID instead of using "default"
+                timestamp = int(datetime.now().timestamp() * 1000)
+                account_id = f"account_{timestamp}"
+
+            conn.execute(db.text("INSERT INTO account (account_id, account_name, account_type) VALUES (:account_id, 'Default Account', 'web')"),
+                        {"account_id": account_id})
+            conn.commit()
+            print(f"✅ Created account: {account_id}")
     print("🔧 Database tables created/verified")
 
-    # ENFORCE SINGLE DEVICE RULE - Clean up any existing multiple devices
-    device_count = Device.query.count()
-    if device_count > 1:
-        print(f"🚨 Found {device_count} devices, enforcing single device rule...")
+    # ENFORCE SINGLE ACCOUNT RULE - Clean up any existing multiple accounts
+    account_count = Account.query.count()
+    if account_count > 1:
+        print(f"🚨 Found {account_count} accounts, enforcing single account rule...")
 
-        # Keep the most recently created device, delete others
-        all_devices = Device.query.order_by(Device.created_at.desc()).all()
-        devices_to_keep = [all_devices[0]]  # Keep the most recent
-        devices_to_delete = all_devices[1:]  # Delete the rest
+        # Keep the most recently created account, delete others
+        all_accounts = Account.query.order_by(Account.created_at.desc()).all()
+        accounts_to_keep = [all_accounts[0]]  # Keep the most recent
+        accounts_to_delete = all_accounts[1:]  # Delete the rest
 
-        for device in devices_to_delete:
-            print(f"🗑️ Removing duplicate device: {device.device_id}")
-            db.session.delete(device)
+        for account in accounts_to_delete:
+            print(f"🗑️ Removing duplicate account: {account.account_id}")
+            db.session.delete(account)
 
         db.session.commit()
-        print("✅ Single device enforcement completed")
-    elif device_count == 1:
-        print("✅ Single device rule verified")
+        print("✅ Single account enforcement completed")
+    elif account_count == 1:
+        print("✅ Single account rule verified")
     else:
-        print("ℹ️ No devices found - first-time setup ready")
+        print("ℹ️ No accounts found - first-time setup ready")
 
-def create_license(payload, device_id):
+def create_license(payload, account_id):
     """Create ONE license total - remove existing licenses before creating new one"""
     # Input validation
     required_fields = ['license_key', 'license_type', 'license_status', 'license_expiry']
@@ -145,18 +228,23 @@ def create_license(payload, device_id):
         if field not in payload:
             return {"status": False, "error": f"Missing required field: {field}"}
 
-    # Validate license type
-    if payload['license_type'] not in ['BLUPOS2025', 'DEMO2025']:
-        return {"status": False, "error": "Invalid license type. Must be 'BLUPOS2025' or 'DEMO2025'"}
+    # Validate license type - allow standard codes and generated codes
+    valid_standard_types = ['BLUPOS2025', 'DEMO2025']
+    is_standard_type = payload['license_type'] in valid_standard_types
+    is_generated_blu = len(payload['license_type']) == 7 and payload['license_type'].startswith('BLU') and payload['license_type'].isalpha() and payload['license_type'].isupper()
+    is_generated_pos = len(payload['license_type']) == 7 and payload['license_type'].startswith('POS') and payload['license_type'].isalpha() and payload['license_type'].isupper()
+
+    if not is_standard_type and not is_generated_blu and not is_generated_pos:
+        return {"status": False, "error": "Invalid license type"}
 
     # Validate license key format (should be string)
     if not isinstance(payload['license_key'], str) or len(payload['license_key']) == 0:
         return {"status": False, "error": "Invalid license key"}
 
-    # Check if device exists
-    device = Device.query.filter_by(device_id=device_id).first()
-    if not device:
-        return {"status": False, "error": "Device not found"}
+    # Check if account exists
+    account = Account.query.filter_by(account_id=account_id).first()
+    if not account:
+        return {"status": False, "error": "Account not found"}
 
     print(f"🔄 Creating license: Removing any existing licenses...")
 
@@ -170,7 +258,7 @@ def create_license(payload, device_id):
 
     # Create the SINGLE license
     license = License()
-    license.device_id = device_id
+    license.account_id = account_id
     license.uid = randomString(16)
     license.license_key = payload['license_key']
     license.license_type = payload['license_type']
@@ -180,7 +268,7 @@ def create_license(payload, device_id):
     try:
         db.session.add(license)
         db.session.commit()
-        print(f"📋 Single license created for device {device_id}: {payload['license_type']} (Total licenses: 1)")
+        print(f"📋 Single license created for account {account_id}: {payload['license_type']} (Total licenses: 1)")
         return {"status": True}
     except Exception as e:
         db.session.rollback()
@@ -208,7 +296,7 @@ def update_license(payload):
         print(f"🗑️ Removed existing license for update")
 
     # Create new license with updated data
-    result = create_license(payload, payload.get('device_id'))
+    result = create_license(payload, payload.get('account_id'))
     return result
 
 # reset_license function here takes the 16digit value and checks against hashed equivakent in the .pos_key.yml file
@@ -871,10 +959,8 @@ def get_restock_printout():
 @app.route('/get_latest_payments', methods=['GET'])
 def get_latest_payments():
     """Get latest 4 payment records for APK interface display"""
-    query = is_active()
-    if not (query['status'] and '/get_sale_record_printout' in query['middleware']['allowed_routes']):
-        return jsonify({"status": "error", "payments": []})
-
+    # Allow access for APK interface without session authentication
+    # This endpoint is for APK data display, not web interface
     try:
         # Get latest 4 sales records ordered by creation date
         latest_payments = SaleRecord.query.order_by(SaleRecord.created_at.desc()).limit(4).all()
@@ -902,10 +988,8 @@ def get_latest_payments():
 @app.route('/get_total_sales', methods=['GET'])
 def get_total_sales():
     """Get real-time total sales amount (paid minus change) for yellow card display"""
-    query = is_active()
-    if not (query['status'] and '/get_sale_record_printout' in query['middleware']['allowed_routes']):
-        return jsonify({"status": "error", "total_sales": "0.00"})
-
+    # Allow access for APK interface without session authentication
+    # This endpoint is for APK data display, not web interface
     try:
         # Calculate total sales: sum of all paid amounts minus sum of all balances/changes
         total_paid = db.session.query(db.func.sum(SaleRecord.sale_paid_amount)).scalar() or 0.0
@@ -925,10 +1009,9 @@ def get_total_sales():
 @app.route('/get_items_report', methods=['GET'])
 def get_items_report():
     """Get comprehensive items report for APK interface display"""
-    query = is_active()
-    if not (query['status'] and '/get_sale_record_printout' in query['middleware']['allowed_routes']):
-        return redirect(query['middleware']['allowed_routes'][0])
-
+    # Allow access for APK interface without session authentication
+    # This endpoint is for APK data display, not web interface
+    query = is_active()  # Define query variable for both branches
     try:
         # Check if request wants HTML for iframe display
         if request.args.get('format') == 'html':
@@ -1209,10 +1292,8 @@ def get_items_report():
 
 @app.route('/get_sale_record_printout', methods=['GET'])
 def get_sale_record_printout():
-    # Common authentication and date parsing for both HTML and PDF formats
-    query = is_active()
-    if not (query['status'] and '/get_sale_record_printout' in query['middleware']['allowed_routes']):
-        return redirect(query['middleware']['allowed_routes'][0])
+    # Allow access for APK interface without session authentication
+    # This endpoint is for APK data display, not web interface
 
     # Get date parameters
     start_date_str = request.args.get('start_date')
@@ -1242,7 +1323,13 @@ def get_sale_record_printout():
         sale_records = SaleRecord.query.order_by(SaleRecord.created_at.desc()).all()  # Latest first
 
     shop_data = load_shop_data()
-    user_name = user_from_session()
+
+    # Handle session gracefully for APK requests
+    try:
+        user_name = user_from_session()
+    except:
+        # Default user info for APK requests
+        user_name = {"user_name": "APK User"}
 
     # Check if request wants HTML for iframe display
     if request.args.get('format') == 'html':
@@ -1268,13 +1355,19 @@ def get_sale_record_printout():
         # Limit records for display (same as PDF limit)
         display_records = sale_records[:500] if sale_records else []
 
+        # Handle session variables gracefully for APK requests
+        try:
+            user_type = query['middleware']
+        except:
+            user_type = 'APK'
+
         response = make_response(render_template(
             'sales_records_html.html',
             is_active=True,
             title="Sales Records Report",
             flash_message=False,
             flash_payload="",
-            user_type=query['middleware'],
+            user_type=user_type,
             user_name=user_name,
             shop_data=[shop_data],
             sale_records=display_records,
@@ -1293,10 +1386,13 @@ def get_sale_record_printout():
     # (sale_records already fetched above with proper ordering)
 
     shop_data = load_shop_data()
-    user_name = user_from_session()
 
-    # Create PDF buffer for landscape A4
-    pdf_buffer = BytesIO()
+    # Handle session gracefully for APK requests
+    try:
+        user_name = user_from_session()
+    except:
+        # Default user info for APK requests
+        user_name = {"user_name": "APK User"}
 
     # Landscape A4 format
     from reportlab.lib.pagesizes import A4, landscape
@@ -1305,6 +1401,7 @@ def get_sale_record_printout():
     from reportlab.lib import colors
     from reportlab.lib.units import inch
 
+    pdf_buffer = BytesIO()
     doc = SimpleDocTemplate(pdf_buffer, pagesize=landscape(A4),
                            leftMargin=0.5*inch, rightMargin=0.5*inch,
                            topMargin=0.5*inch, bottomMargin=0.5*inch)
@@ -2257,6 +2354,55 @@ def health_check():
         "version": __version__
     })
 
+@app.route('/generate_activation_qr', methods=['GET'])
+def generate_activation_qr():
+    """Generate QR code for device activation (first-time activation)"""
+    try:
+        # Generate activation code - randomly choose between full and half license
+        license_types = [
+            ('BLU', 183, 'Half License (183 days)'),  # BLU prefix for half license
+            ('POS', 366, 'Full License (366 days)')   # POS prefix for full license
+        ]
+
+        # Randomly select license type
+        prefix, days, description = random.choice(license_types)
+        activation_code = f"{prefix}{randomString(4).upper()}"
+
+        # Generate QR code data for APK activation
+        qr_data = f"""BluPOS Device Activation
+Activation Code: {activation_code}
+License Type: {description}
+Duration: {days} days
+Instructions: Scan with BluPOS APK to activate device
+Generated: {datetime.now().isoformat()}
+System: BluPOS Point of Sale"""
+
+        # Generate QR code
+        qr = qrcode.QRCode(version=1, box_size=10, border=4)
+        qr.add_data(qr_data)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+
+        # Convert to base64
+        buffer = BytesIO()
+        img.save(buffer, format='PNG')
+        buffer.seek(0)
+        qr_base64 = base64.b64encode(buffer.read()).decode('utf-8')
+        qr_data_url = f"data:image/png;base64,{qr_base64}"
+
+        return jsonify({
+            "status": "success",
+            "activation_code": activation_code,
+            "license_days": days,
+            "license_type": description,
+            "qr_code": qr_data_url,
+            "instructions": "Scan this QR code with the BluPOS APK to activate your device"
+        })
+
+    except Exception as e:
+        print(f"Activation QR generation error: {e}")
+        return jsonify({"status": "error", "message": "Failed to generate activation QR code"}), 500
+
 @app.route('/generate_license_qr', methods=['POST'])
 def generate_license_qr():
     """Generate QR code for license activation"""
@@ -2267,10 +2413,10 @@ def generate_license_qr():
             return jsonify({"status": "error", "message": "No data provided"}), 400
 
         license_days = data.get('license_days')
-        device_id = data.get('device_id')
+        account_id = data.get('account_id')
 
-        if not license_days or not device_id:
-            return jsonify({"status": "error", "message": "Missing license_days or device_id"}), 400
+        if not license_days or not account_id:
+            return jsonify({"status": "error", "message": "Missing license_days or account_id"}), 400
 
         # Validate license days
         if license_days not in [183, 366]:
@@ -2329,40 +2475,45 @@ def device_activation():
         if not action:
             return jsonify({"status": "error", "message": "Missing action"}), 400
 
-        # For polling actions (check_expiry), use existing device or return first_time
+        # For polling actions (check_expiry), use existing account or return first_time
         if action != 'first_time':
-            existing_device = Device.query.first()
-            if existing_device:
-                device_id = existing_device.device_id
+            existing_account = Account.query.first()
+            if existing_account:
+                account_id = existing_account.account_id
                 # Update last seen for polling
-                existing_device.last_seen = datetime.now()
+                existing_account.last_seen = datetime.now()
                 db.session.commit()
-                print(f" Checking device: {device_id}")
+                print(f" Checking account: {account_id}")
             else:
-                # No device exists yet, return first_time state
+                # No account exists yet, return first_time state
                 return jsonify({
                     "status": "success",
                     "app_state": "first_time",
-                    "message": "No device activated yet"
+                    "message": "No account activated yet"
                 })
         else:
-            # First-time activation: Use PERSISTENT device (create only if none exists)
-            print("🔧 First-time activation: Checking for persistent device...")
+            # First-time activation: ENFORCE BLUPOS as single source of truth
+            # APK should NOT send account_id - BluPOS provides the official one
+            print("🔧 First-time activation: BluPOS as single source of truth...")
 
-            existing_device = Device.query.first()
-            if existing_device:
-                # USE the existing persistent device
-                device_id = existing_device.device_id
-                print(f"🔄 Using persistent device: {device_id}")
+            apk_sent_account = data.get('account_id')
+            if apk_sent_account:
+                print(f"⚠️ APK sent account_id: {apk_sent_account} - IGNORING (BluPOS is source of truth)")
+
+            # Always use/create the ONE persistent account
+            existing_account = Account.query.first()
+            if existing_account:
+                account_id = existing_account.account_id
+                print(f"🔄 Using EXISTING persistent account: {account_id}")
             else:
-                # Create the PERSISTENT device (only happens once ever)
-                device_id = f"device_{int(datetime.now().timestamp() * 1000)}"
-                print(f"🔧 Generated PERSISTENT Device ID: {device_id}")
+                # Create the SINGLE account (only happens once ever)
+                account_id = f"account_{int(datetime.now().timestamp() * 1000)}"
+                print(f"🔧 Generated SINGLE Account ID: {account_id}")
 
-                device = Device(device_id=device_id, device_type='web')
-                db.session.add(device)
+                account = Account(account_id=account_id, account_type='web')
+                db.session.add(account)
                 db.session.commit()
-                print(f"📱 PERSISTENT device created: {device_id} (Will be reused forever)")
+                print(f"📱 SINGLE account created: {account_id} (BluPOS source of truth)")
 
         if action == 'first_time':
             activation_code = data.get('activation_code')
@@ -2372,45 +2523,50 @@ def device_activation():
             # Validate activation code - allow standard codes or generated license keys
             valid_codes = ['BLUPOS2025', 'DEMO2025']
             is_standard_code = activation_code in valid_codes
-            is_generated_key = len(activation_code) == 7 and activation_code.startswith('POS') and activation_code.isalpha() and activation_code.isupper()  # Generated keys are "POS" + 4 uppercase letters
+            is_generated_blu = len(activation_code) == 7 and activation_code.startswith('BLU') and activation_code.isalpha() and activation_code.isupper()  # BLU prefix for half license (183 days)
+            is_generated_pos = len(activation_code) == 7 and activation_code.startswith('POS') and activation_code.isalpha() and activation_code.isupper()  # POS prefix for full license (366 days)
 
-            if not is_standard_code and not is_generated_key:
+            if not is_standard_code and not is_generated_blu and not is_generated_pos:
                 return jsonify({"status": "error", "message": "Invalid activation code"}), 400
 
-            # Check if device already activated (one license per device)
-            existing_license = License.query.filter_by(device_id=device_id).first()
+            # Check if account already activated (one license per account)
+            existing_license = License.query.filter_by(account_id=account_id).first()
             if existing_license:
-                return jsonify({"status": "error", "message": "Device already activated"}), 400
+                return jsonify({"status": "error", "message": "Account already activated"}), 400
 
-            # Determine license type and duration - ENFORCED: Only 2 license types
-            # Check if activation code is one of the standard codes
+            # Determine license type and duration based on activation code
             if activation_code == 'BLUPOS2025':
                 license_type = 'BLUPOS2025'
                 license_days = 366  # 1 year
             elif activation_code == 'DEMO2025':
                 license_type = 'DEMO2025'
                 license_days = 183  # 6 months
+            elif is_generated_blu:
+                # BLU prefix = half license (183 days)
+                license_type = activation_code
+                license_days = 183
+            elif is_generated_pos:
+                # POS prefix = full license (366 days)
+                license_type = activation_code
+                license_days = 366
             else:
-                # Check if it's a generated license key (from QR code generation)
-                # For generated keys, we use them directly as license keys
-                license_type = activation_code  # Use the generated key as license type
-                license_days = 366  # Default to 1 year for generated keys
+                return jsonify({"status": "error", "message": "Invalid activation code format"}), 400
 
-            # Create new license
-            expiry_date = datetime.now() + timedelta(days=license_days)
+            # Create new license - use timezone-aware datetime
+            expiry_date = datetime.now(timezone.utc) + timedelta(days=license_days)
             license_data = {
-                "license_key": f"{license_type}|{device_id}",
+                "license_key": f"{license_type}|{account_id}",
                 "license_type": license_type,
                 "license_status": True,
                 "license_expiry": expiry_date
             }
 
-            result = create_license(license_data, device_id)
+            result = create_license(license_data, account_id)
             if result:
                 return jsonify({
                     "status": "success",
-                    "message": "Device activated successfully",
-                    "device_id": device_id,
+                    "message": "Account activated successfully",
+                    "account_id": account_id,
                     "license_expiry": expiry_date.isoformat(),
                     "app_state": "active",
                     "license_type": license_type,
@@ -2420,13 +2576,13 @@ def device_activation():
                 return jsonify({"status": "error", "message": "Failed to create license"}), 500
 
         elif action == 'check_expiry':
-            # Check current license status - one license per device
-            license = License.query.filter_by(device_id=device_id).first()
+            # Check current license status - one license per account
+            license = License.query.filter_by(account_id=account_id).first()
             if not license:
                 return jsonify({
                     "status": "success",
                     "app_state": "first_time",
-                    "message": "Device not activated"
+                    "message": "Account not activated"
                 })
 
             now = datetime.now()
@@ -2435,7 +2591,7 @@ def device_activation():
                 return jsonify({
                     "status": "success",
                     "app_state": "active",
-                    "device_id": device_id,  # Include device_id in response
+                    "account_id": account_id,  # Include account_id in response
                     "license_expiry": license.license_expiry.isoformat(),
                     "days_remaining": days_remaining,
                     "license_type": license.license_type
@@ -2445,7 +2601,7 @@ def device_activation():
                 return jsonify({
                     "status": "success",
                     "app_state": "expired",
-                    "device_id": device_id,  # Include device_id in response
+                    "account_id": account_id,  # Include account_id in response
                     "license_expiry": license.license_expiry.isoformat(),
                     "days_overdue": days_overdue,
                     "license_type": license.license_type
@@ -2456,18 +2612,22 @@ def device_activation():
             if not activation_code:
                 return jsonify({"status": "error", "message": "Missing activation_code"}), 400
 
-            # Validate activation code
+            # Validate activation code - allow standard codes and generated codes
             valid_codes = ['BLUPOS2025', 'DEMO2025']
-            if activation_code not in valid_codes:
+            is_standard_code = activation_code in valid_codes
+            is_generated_blu = len(activation_code) == 7 and activation_code.startswith('BLU') and activation_code.isalpha() and activation_code.isupper()
+            is_generated_pos = len(activation_code) == 7 and activation_code.startswith('POS') and activation_code.isalpha() and activation_code.isupper()
+
+            if not is_standard_code and not is_generated_blu and not is_generated_pos:
                 return jsonify({"status": "error", "message": "Invalid activation code"}), 400
 
-            # Check if device exists
-            device = Device.query.filter_by(device_id=device_id).first()
-            if not device:
-                return jsonify({"status": "error", "message": "Device not found"}), 404
+            # Check if account exists
+            account = Account.query.filter_by(account_id=account_id).first()
+            if not account:
+                return jsonify({"status": "error", "message": "Account not found"}), 404
 
-            # Check if license exists for this device
-            existing_license = License.query.filter_by(device_id=device_id).first()
+            # Check if license exists for this account
+            existing_license = License.query.filter_by(account_id=account_id).first()
 
             # Determine license type and duration - ENFORCED: Only 2 license types
             if activation_code == 'BLUPOS2025':
@@ -2481,7 +2641,7 @@ def device_activation():
                 # Update existing license
                 existing_license.license_type = license_type
                 existing_license.license_status = True
-                existing_license.license_expiry = datetime.now() + timedelta(days=license_days)
+                existing_license.license_expiry = datetime.now(timezone.utc) + timedelta(days=license_days)
                 existing_license.updated_at = datetime.now()
                 db.session.commit()
 
@@ -2494,15 +2654,15 @@ def device_activation():
                 })
             else:
                 # No license exists (after reset), create new one
-                expiry_date = datetime.now() + timedelta(days=license_days)
+                expiry_date = datetime.now(timezone.utc) + timedelta(days=license_days)
                 license_data = {
-                    "license_key": f"{license_type}|{device_id}",
+                    "license_key": f"{license_type}|{account_id}",
                     "license_type": license_type,
                     "license_status": True,
                     "license_expiry": expiry_date
                 }
 
-                result = create_license(license_data, device_id)
+                result = create_license(license_data, account_id)
                 if result:
                     return jsonify({
                         "status": "success",
@@ -2515,10 +2675,10 @@ def device_activation():
                     return jsonify({"status": "error", "message": "Failed to create license"}), 500
 
         elif action == 'next_1_min_expiry':
-            # Check if license exists for this device
-            existing_license = License.query.filter_by(device_id=device_id).first()
+            # Check if license exists for this account
+            existing_license = License.query.filter_by(account_id=account_id).first()
             if not existing_license:
-                return jsonify({"status": "error", "message": "Device not found"}), 404
+                return jsonify({"status": "error", "message": "Account not found"}), 404
 
             # Set expiry to next 1 minute for testing
             existing_license.license_status = True
@@ -2543,37 +2703,37 @@ def device_activation():
 def apk_connection_status():
     """Check APK connection status based on heartbeat signals"""
     try:
-        # Get device_id from query parameter or use current device
-        device_id = request.args.get('device_id')
+        # Get account_id from query parameter or use current account
+        account_id = request.args.get('account_id')
 
-        if not device_id:
-            # Try to get from current device context
-            device_id = request.args.get('current_device_id')
+        if not account_id:
+            # Try to get from current account context
+            account_id = request.args.get('current_account_id')
 
-        if not device_id:
-            # Get the most recently active device
-            device = Device.query.order_by(Device.last_seen.desc()).first()
-            if device:
-                device_id = device.device_id
+        if not account_id:
+            # Get the most recently active account
+            account = Account.query.order_by(Account.last_seen.desc()).first()
+            if account:
+                account_id = account.account_id
             else:
                 return jsonify({
                     "status": "success",
                     "connected": False,
-                    "message": "No device found",
+                    "message": "No account found",
                     "last_seen": None
                 })
 
-        # Check if device exists
-        device = Device.query.filter_by(device_id=device_id).first()
-        if not device:
+        # Check if account exists
+        account = Account.query.filter_by(account_id=account_id).first()
+        if not account:
             return jsonify({
                 "status": "error",
-                "message": "Device not found"
+                "message": "Account not found"
             }), 404
 
         # Check connection status based on last_seen timestamp
         now = datetime.now(timezone.utc)
-        last_seen = device.last_seen.replace(tzinfo=timezone.utc) if device.last_seen else None
+        last_seen = account.last_seen.replace(tzinfo=timezone.utc) if account.last_seen else None
 
         if not last_seen:
             connected = False
@@ -2587,7 +2747,7 @@ def apk_connection_status():
         return jsonify({
             "status": "success",
             "connected": connected,
-            "device_id": device_id,
+            "account_id": account_id,
             "last_seen": last_seen_str,
             "time_diff_seconds": (now - last_seen).total_seconds() if last_seen else None
         })
@@ -2605,23 +2765,23 @@ def apk_heartbeat():
         if not data:
             return jsonify({"status": "error", "message": "No data provided"}), 400
 
-        device_id = data.get('device_id')
+        account_id = data.get('account_id')
         license_key = data.get('license_key')
         timestamp = data.get('timestamp')
         battery_level = data.get('battery_level', 0)
         network_type = data.get('network_type', 'unknown')
 
-        if not device_id:
-            return jsonify({"status": "error", "message": "Missing device_id"}), 400
+        if not account_id:
+            return jsonify({"status": "error", "message": "Missing account_id"}), 400
 
-        # Update device last_seen timestamp
-        device = Device.query.filter_by(device_id=device_id).first()
-        if device:
-            device.last_seen = datetime.now()
+        # Update account last_seen timestamp
+        account = Account.query.filter_by(account_id=account_id).first()
+        if account:
+            account.last_seen = datetime.now()
             db.session.commit()
 
             # Log heartbeat details
-            print(f"📡 Heartbeat received from device {device_id}: battery={battery_level}%, network={network_type}")
+            print(f"📡 Heartbeat received from account {account_id}: battery={battery_level}%, network={network_type}")
 
             return jsonify({
                 "status": "success",
@@ -2630,7 +2790,7 @@ def apk_heartbeat():
                 "commands": []  # Future use for remote commands
             })
         else:
-            return jsonify({"status": "error", "message": "Device not found"}), 404
+            return jsonify({"status": "error", "message": "Account not found"}), 404
 
     except Exception as e:
         print(f"Heartbeat error: {e}")
@@ -2646,34 +2806,52 @@ def validate_license():
             return jsonify({"status": "error", "message": "No data provided"}), 400
 
         license_key = data.get('license_key')
-        device_id = data.get('device_id')
+        account_id = data.get('account_id')
         device_info = data.get('device_info', {})
 
-        if not license_key or not device_id:
-            return jsonify({"status": "error", "message": "Missing license_key or device_id"}), 400
+        if not license_key or not account_id:
+            return jsonify({"status": "error", "message": "Missing license_key or account_id"}), 400
 
-        # Find device
-        device = Device.query.filter_by(device_id=device_id).first()
-        if not device:
-            return jsonify({"status": "error", "message": "Device not found"}), 404
+        print(f"🔍 Validating license: key='{license_key}', account='{account_id}'")
 
-        # Find license for this device
-        license = License.query.filter_by(device_id=device_id).first()
+        # Find account
+        account = Account.query.filter_by(account_id=account_id).first()
+        if not account:
+            print(f"❌ Account not found: {account_id}")
+            return jsonify({"status": "error", "message": "Account not found"}), 404
+
+        # Find license for this account
+        license = License.query.filter_by(account_id=account_id).first()
         if not license:
-            return jsonify({"status": "error", "message": "No license found for device"}), 404
+            print(f"❌ No license found for account: {account_id}")
+            return jsonify({"status": "error", "message": "No license found for account"}), 404
 
-        # Check if license key matches
+        print(f"📋 Found license: type='{license.license_type}', key='{license.license_key}'")
+
+        # Check if license key matches (allow partial match for license type)
         expected_key = license.license_key
-        if license_key != expected_key:
+        license_type_match = license_key == license.license_type  # e.g., "POSRNQD" matches license type
+        full_key_match = license_key == expected_key  # e.g., "POSRNQD|account_123" matches full key
+
+        if not license_type_match and not full_key_match:
+            print(f"❌ License key mismatch: provided='{license_key}', expected='{expected_key}', type='{license.license_type}'")
             return jsonify({"status": "error", "message": "Invalid license key"}), 400
 
         # Check if license is active and not expired
         now = datetime.now()
-        if not license.license_status or license.license_expiry <= now:
-            return jsonify({"status": "error", "message": "License expired or inactive"}), 400
+        if not license.license_status:
+            print(f"❌ License inactive")
+            return jsonify({"status": "error", "message": "License inactive"}), 400
+
+        if license.license_expiry <= now:
+            days_overdue = (now - license.license_expiry).days
+            print(f"❌ License expired {days_overdue} days ago")
+            return jsonify({"status": "error", "message": "License expired"}), 400
 
         # Calculate days remaining
         days_remaining = (license.license_expiry - now).days
+
+        print(f"✅ License validation successful: {license.license_type}, expires in {days_remaining} days")
 
         return jsonify({
             "status": "success",
@@ -2685,7 +2863,7 @@ def validate_license():
         })
 
     except Exception as e:
-        print(f"License validation error: {e}")
+        print(f"❌ License validation error: {e}")
         return jsonify({"status": "error", "message": "Internal server error"}), 500
 
 @app.route('/test', methods=['POST'])
@@ -2698,18 +2876,18 @@ def test_endpoint():
             return jsonify({"status": "error", "message": "No data provided"}), 400
 
         action = data.get('action')
-        device_id = data.get('device_id')
+        account_id = data.get('account_id')
 
         if not action:
             return jsonify({"status": "error", "message": "Missing action"}), 400
 
         if action == 'force_expiry':
-            if not device_id:
-                return jsonify({"status": "error", "message": "Missing device_id"}), 400
+            if not account_id:
+                return jsonify({"status": "error", "message": "Missing account_id"}), 400
 
-            license = License.query.filter_by(device_id=device_id).first()
+            license = License.query.filter_by(account_id=account_id).first()
             if not license:
-                return jsonify({"status": "error", "message": "Device not found"}), 404
+                return jsonify({"status": "error", "message": "Account not found"}), 404
 
             # Force expiry by setting past date
             license.license_status = False
@@ -2724,10 +2902,10 @@ def test_endpoint():
             })
 
         elif action == 'reset_first_time':
-            if not device_id:
-                return jsonify({"status": "error", "message": "Missing device_id"}), 400
+            if not account_id:
+                return jsonify({"status": "error", "message": "Missing account_id"}), 400
 
-            license = License.query.filter_by(device_id=device_id).first()
+            license = License.query.filter_by(account_id=account_id).first()
             if license:
                 db.session.delete(license)
                 db.session.commit()
@@ -2740,20 +2918,25 @@ def test_endpoint():
 
         elif action == 'update_license':
             license_type = data.get('license_type')
-            if not device_id or not license_type:
-                return jsonify({"status": "error", "message": "Missing device_id or license_type"}), 400
+            if not account_id or not license_type:
+                return jsonify({"status": "error", "message": "Missing account_id or license_type"}), 400
 
-            valid_types = ['BLUPOS2025', 'DEMO2025']
-            if license_type not in valid_types:
-                return jsonify({"status": "error", "message": "Invalid license type. Use BLUPOS2025 or DEMO2025"}), 400
+            # Validate license type - allow standard codes and generated codes
+            valid_standard_types = ['BLUPOS2025', 'DEMO2025']
+            is_standard_type = license_type in valid_standard_types
+            is_generated_blu = len(license_type) == 7 and license_type.startswith('BLU') and license_type.isalpha() and license_type.isupper()
+            is_generated_pos = len(license_type) == 7 and license_type.startswith('POS') and license_type.isalpha() and license_type.isupper()
 
-            # Check if device exists
-            device = Device.query.filter_by(device_id=device_id).first()
-            if not device:
-                return jsonify({"status": "error", "message": "Device not found"}), 404
+            if not is_standard_type and not is_generated_blu and not is_generated_pos:
+                return jsonify({"status": "error", "message": "Invalid license type"}), 400
 
-            # Check if license exists for this device
-            license = License.query.filter_by(device_id=device_id).first()
+            # Check if account exists
+            account = Account.query.filter_by(account_id=account_id).first()
+            if not account:
+                return jsonify({"status": "error", "message": "Account not found"}), 404
+
+            # Check if license exists for this account
+            license = License.query.filter_by(account_id=account_id).first()
 
             if license:
                 # Update existing license
@@ -2777,13 +2960,13 @@ def test_endpoint():
                 expiry_date = datetime.now() + timedelta(days=license_days)
 
                 license_data = {
-                    "license_key": f"{license_type}|{device_id}",
+                    "license_key": f"{license_type}|{account_id}",
                     "license_type": license_type,
                     "license_status": True,
                     "license_expiry": expiry_date
                 }
 
-                result = create_license(license_data, device_id)
+                result = create_license(license_data, account_id)
                 if result:
                     return jsonify({
                         "status": "success",
@@ -2795,12 +2978,12 @@ def test_endpoint():
                     return jsonify({"status": "error", "message": "Failed to create license"}), 500
 
         elif action == 'next_1_min_expiry':
-            if not device_id:
-                return jsonify({"status": "error", "message": "Missing device_id"}), 400
+            if not account_id:
+                return jsonify({"status": "error", "message": "Missing account_id"}), 400
 
-            license = License.query.filter_by(device_id=device_id).first()
+            license = License.query.filter_by(account_id=account_id).first()
             if not license:
-                return jsonify({"status": "error", "message": "Device not found"}), 404
+                return jsonify({"status": "error", "message": "Account not found"}), 404
 
             # Set expiry to next 1 minute for testing
             license.license_status = True
@@ -2815,10 +2998,10 @@ def test_endpoint():
             })
 
         elif action == 'get_status':
-            if not device_id:
-                return jsonify({"status": "error", "message": "Missing device_id"}), 400
+            if not account_id:
+                return jsonify({"status": "error", "message": "Missing account_id"}), 400
 
-            license = License.query.filter_by(device_id=device_id).first()
+            license = License.query.filter_by(account_id=account_id).first()
 
             if not license:
                 return jsonify({
@@ -2848,9 +3031,188 @@ def test_endpoint():
         print(f"Test endpoint error: {e}")
         return jsonify({"status": "error", "message": "Internal server error"}), 500
 
+# Secure Network Discovery Broadcasting Service
+class SecureNetworkDiscoveryService:
+    def __init__(self, port=8888):
+        self.port = port
+        self.multicast_group = '239.255.1.1'
+        self.running = False
+        self.broadcast_thread = None
+        self.session_key = None
+        self.session_expiry = None
+        self.broadcast_interval = 30  # seconds
+        self.session_rotation_interval = 1800  # 30 minutes
+        
+    def generate_session_key(self):
+        """Generate a secure session key for encryption"""
+        return base64.b64encode(os.urandom(32)).decode('utf-8')
+    
+    def create_hmac(self, data, key):
+        """Create HMAC for data authentication"""
+        key_bytes = key.encode('utf-8')
+        data_bytes = data.encode('utf-8')
+        return hmac.new(key_bytes, data_bytes, hashlib.sha256).hexdigest()
+    
+    def encrypt_data(self, data, key):
+        """Encrypt data using AES-256-CBC"""
+        try:
+            # Generate key and IV from the session key
+            key_bytes = hashlib.sha256(key.encode('utf-8')).digest()
+            iv = os.urandom(16)
+            
+            # Pad data to 16-byte boundary
+            padder = padding.PKCS7(128).padder()
+            padded_data = padder.update(data.encode('utf-8')) + padder.finalize()
+            
+            # Encrypt
+            cipher = Cipher(algorithms.AES(key_bytes), modes.CBC(iv), backend=default_backend())
+            encryptor = cipher.encryptor()
+            encrypted_data = encryptor.update(padded_data) + encryptor.finalize()
+            
+            # Return IV + encrypted data, base64 encoded
+            return base64.b64encode(iv + encrypted_data).decode('utf-8')
+        except Exception as e:
+            print(f"Encryption error: {e}")
+            return None
+    
+    def create_secure_packet(self):
+        """Create a secure broadcast packet"""
+        try:
+            # Get account information
+            account = Account.query.first()
+            if not account:
+                print("❌ No account found for secure broadcasting")
+                return None
+            
+            # Generate or rotate session key
+            now = datetime.now(timezone.utc)
+            if not self.session_key or not self.session_expiry or now >= self.session_expiry:
+                self.session_key = self.generate_session_key()
+                self.session_expiry = now + timedelta(seconds=self.session_rotation_interval)
+                print(f"🔄 Generated new session key, expires at {self.session_expiry}")
+            
+            # Create server info
+            server_info = {
+                'server_type': 'blupos_backend',
+                'ip_address': '0.0.0.0',  # Will be resolved by clients
+                'port': self.port,
+                'server_name': 'BluPOS Backend Server',
+                'last_seen': now.isoformat(),
+                'timestamp': int(now.timestamp()),
+                'url': f'http://0.0.0.0:{self.port}'
+            }
+            
+            # Encrypt server info
+            encrypted_server_info = self.encrypt_data(json.dumps(server_info), self.session_key)
+            if not encrypted_server_info:
+                return None
+            
+            # Create HMAC for authentication
+            hmac_value = self.create_hmac(encrypted_server_info, self.session_key)
+            
+            # Create secure packet
+            packet = {
+                'version': '1.0',
+                'timestamp': now.isoformat(),
+                'encrypted_session_key': self.session_key,
+                'encrypted_server_info': encrypted_server_info,
+                'hmac': hmac_value,
+                'padding': base64.b64encode(os.urandom(16)).decode('utf-8')
+            }
+            
+            return json.dumps(packet)
+        except Exception as e:
+            print(f"Error creating secure packet: {e}")
+            return None
+    
+    def broadcast_loop(self):
+        """Main broadcasting loop"""
+        try:
+            # Create UDP socket
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            
+            # Enable broadcasting
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            
+            # Set TTL for multicast
+            ttl = struct.pack('b', 2)
+            sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
+            
+            print(f"📡 Secure network discovery broadcasting on {self.multicast_group}:{self.port}")
+            print(f"🔐 Session key rotation every {self.session_rotation_interval//60} minutes")
+            
+            while self.running:
+                try:
+                    # Create and send secure packet
+                    packet_data = self.create_secure_packet()
+                    if packet_data:
+                        packet_bytes = packet_data.encode('utf-8')
+                        sock.sendto(packet_bytes, (self.multicast_group, self.port))
+                        print(f"📡 Secure broadcast sent ({len(packet_bytes)} bytes)")
+                    
+                    # Wait for next broadcast
+                    time.sleep(self.broadcast_interval)
+                    
+                except Exception as e:
+                    print(f"Broadcast error: {e}")
+                    time.sleep(1)  # Short delay before retrying
+                    
+        except Exception as e:
+            print(f"Broadcasting setup error: {e}")
+        finally:
+            sock.close()
+    
+    def start(self):
+        """Start the secure network discovery service"""
+        if self.running:
+            print("⚠️ Secure network discovery already running")
+            return
+        
+        self.running = True
+        self.broadcast_thread = threading.Thread(target=self.broadcast_loop, daemon=True)
+        self.broadcast_thread.start()
+        print("🔐 Secure network discovery service started")
+    
+    def stop(self):
+        """Stop the secure network discovery service"""
+        self.running = False
+        if self.broadcast_thread:
+            self.broadcast_thread.join(timeout=2)
+        print("🔐 Secure network discovery service stopped")
+
+# Global secure discovery service instance
+secure_discovery_service = SecureNetworkDiscoveryService()
+
 def run_heroku_mode():
     h_port = int(os.environ.get('PORT', 8080))
-    app.run(host='0.0.0.0', port=h_port, debug=True)
+
+    # Start secure network discovery broadcasting
+    try:
+        secure_discovery_service.start()
+        print("🔐 Secure network discovery broadcasting started")
+        print("📡 [BACKEND] Secure network discovery service initialized")
+        print("📡 [BACKEND] Broadcasting on port 8888")
+        print("📡 [BACKEND] Multicast group: 239.255.1.1")
+        print("📡 [BACKEND] TTL: 2 (local network only)")
+        print("🔐 [BACKEND] AES-256-CBC encryption with HMAC-SHA256 authentication")
+        print("🔐 [BACKEND] Session key rotation every 30 minutes")
+    except Exception as e:
+        print(f"⚠️ Failed to start secure network discovery broadcasting: {e}")
+
+    # Start legacy network discovery broadcasting if available
+    if BROADCAST_AVAILABLE:
+        try:
+            start_backend_broadcast(port=h_port)
+            print("🔍 Legacy network discovery broadcasting started")
+        except Exception as e:
+            print(f"⚠️ Failed to start legacy network discovery broadcasting: {e}")
+
+    print(f"🚀 Starting BluPOS backend server on 0.0.0.0:{h_port}")
+    print(f"🌐 Server will be accessible at: http://localhost:{h_port}")
+    print(f"🌐 External access: http://<your-ip>:{h_port}")
+    print(f"📡 Make sure firewall allows port {h_port}")
+    app.run(host='0.0.0.0', port=h_port, debug=True, threaded=True)
 
 if __name__ == "__main__":
     run_heroku_mode()
