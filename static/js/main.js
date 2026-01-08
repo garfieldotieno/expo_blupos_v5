@@ -482,6 +482,13 @@ function add_sale_record() {
     console.log('Sale object before sending to server:');
     console.log(sale_object);
 
+    // Adjust timestamp for backend time sync (backend is 2 hours behind)
+    const now = new Date();
+    now.setHours(now.getHours() + 2); // Add 2 hours for backend sync
+    sale_object.timestamp = now.toISOString();
+
+    console.log('Adjusted timestamp for backend:', sale_object.timestamp);
+
     const payload = {
         sale_clerk: current_sale_clerk,
         sale_total: sale_object.sale_total,

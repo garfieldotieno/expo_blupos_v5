@@ -76,11 +76,266 @@ Based on the design language specifications, implement the three core pages:
 - **Background Service**: Persistent server operation with battery optimization
 - **Security**: Basic authentication and encrypted channels
 
-### Stage 3: SMS Parsing Integration
-- **Permission Management**: SMS_READ permission request during activation
-- **Message Processing**: Background service for SMS monitoring and parsing
-- **Data Extraction**: Intelligent parsing of transaction amounts, senders, timestamps
-- **Validation**: User confirmation before transaction acceptance
+### Stage 3: SMS Parsing Integration (Platform Channels)
+
+**⚠️ IMPORTANT: Custom Platform Channels Required**
+
+The current `flutter_sms` package is designed for **sending** SMS only. For proper SMS validation and monitoring, we need to implement custom platform channels with native Android code.
+
+#### Platform Channel Architecture
+
+```mermaid
+graph TD
+    A[Flutter App] --> B[Platform Channel]
+    B --> C[Native Android Service]
+    C --> D[Kotlin SMS BroadcastReceiver]
+    D --> E[Parse SMS Content]
+    E --> F[Extract Payment Data]
+    F --> G[Send to Flutter via Channel]
+    G --> H[Update Payment Queue]
+```
+
+#### Required Native Android Components
+
+**1. SMS BroadcastReceiver (Kotlin)**
+```kotlin
+// android/app/src/main/java/com/blupos/wallet/SmsReceiver.kt
+class SmsReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action == "android.provider.Telephony.SMS_RECEIVED") {
+            val bundle = intent.extras
+            if (bundle != null) {
+                val pdus = bundle.get("pdus") as Array<*>?
+                if (pdus != null) {
+                    for (pdu in pdus) {
+                        val smsMessage = SmsMessage.createFromPdu(pdu as ByteArray)
+                        val sender = smsMessage.originatingAddress
+                        val message = smsMessage.messageBody
+                        
+                        // Parse payment message
+                        if (isPaymentMessage(message)) {
+                            val paymentData = parsePaymentMessage(message, sender)
+                            
+                            // Send to Flutter via platform channel
+                            sendPaymentToFlutter(paymentData)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    private fun isPaymentMessage(message: String): Boolean {
+        // Detect payment confirmation messages
+        val paymentKeywords = listOf("confirmed", "received", "payment", "M-PESA")
+        return paymentKeywords.any { message.contains(it, ignoreCase = true) }
+    }
+    
+    private fun parsePaymentMessage(message: String, sender: String?): PaymentData {
+        // Extract amount, reference, sender
+        val amountPattern = Regex("""KES\s*([\d,]+\.\d{2})""")
+        val refPattern = Regex("""Ref:\s*(\w+)""")
+        
+        val amountMatch = amountPattern.find(message)
+        val refMatch = refPattern.find(message)
+        
+        return PaymentData(
+            amount = amountMatch?.groupValues?.get(1)?.replace(",", "")?.toDoubleOrNull() ?: 0.0,
+            reference = refMatch?.groupValues?.get(1) ?: "",
+            sender = sender ?: "",
+            message = message,
+            timestamp = System.currentTimeMillis()
+        )
+    }
+}
+```
+
+**2. Platform Channel Handler (Kotlin)**
+```kotlin
+// android/app/src/main/java/com/blupos/wallet/SmsChannelHandler.kt
+class SmsChannelHandler(private val context: Context) {
+    private val channel = MethodChannel(
+        (context as Activity).flutterEngine?.dartExecutor,
+        "com.blupos.wallet/sms"
+    )
+    
+    init {
+        channel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "startSmsMonitoring" -> {
+                    startSmsMonitoring()
+                    result.success(true)
+                }
+                "stopSmsMonitoring" -> {
+                    stopSmsMonitoring()
+                    result.success(true)
+                }
+                "getSmsPermissions" -> {
+                    checkPermissions()
+                    result.success(true)
+                }
+                else -> result.notImplemented()
+            }
+        }
+    }
+    
+    private fun startSmsMonitoring() {
+        // Register SMS receiver
+        val intentFilter = IntentFilter("android.provider.Telephony.SMS_RECEIVED")
+        intentFilter.priority = IntentFilter.SYSTEM_HIGH_PRIORITY
+        context.registerReceiver(SmsReceiver(), intentFilter)
+    }
+    
+    private fun stopSmsMonitoring() {
+        try {
+            context.unregisterReceiver(SmsReceiver())
+        } catch (e: IllegalArgumentException) {
+            // Receiver not registered
+        }
+    }
+    
+    private fun sendPaymentToFlutter(paymentData: PaymentData) {
+        channel.invokeMethod("onPaymentReceived", paymentData.toMap())
+    }
+}
+```
+
+**3. Flutter Platform Channel Integration**
+```dart
+// lib/services/sms_service.dart (Updated)
+class SmsService extends ChangeNotifier {
+  static const platform = MethodChannel('com.blupos.wallet/sms');
+  
+  // Start native SMS monitoring
+  Future<void> startNativeSmsMonitoring() async {
+    try {
+      await platform.invokeMethod('startSmsMonitoring');
+      _isListening = true;
+      notifyListeners();
+    } catch (e) {
+      print('Error starting SMS monitoring: $e');
+    }
+  }
+  
+  // Stop native SMS monitoring
+  Future<void> stopNativeSmsMonitoring() async {
+    try {
+      await platform.invokeMethod('stopSmsMonitoring');
+      _isListening = false;
+      notifyListeners();
+    } catch (e) {
+      print('Error stopping SMS monitoring: $e');
+    }
+  }
+  
+  // Setup platform channel listener
+  void setupPlatformChannel() {
+    platform.setMethodCallHandler((call) async {
+      if (call.method == 'onPaymentReceived') {
+        final paymentData = call.arguments as Map<String, dynamic>;
+        _handleIncomingPayment(paymentData);
+      }
+    });
+  }
+  
+  void _handleIncomingPayment(Map<String, dynamic> paymentData) {
+    // Process payment and add to queue
+    _paymentQueue.add(paymentData);
+    _updateUnreadCount();
+    notifyListeners();
+  }
+}
+```
+
+#### Android Manifest Updates
+```xml
+<!-- Add to AndroidManifest.xml -->
+<uses-permission android:name="android.permission.RECEIVE_SMS" />
+<uses-permission android:name="android.permission.READ_SMS" />
+
+<application>
+    <!-- SMS Receiver -->
+    <receiver android:name=".SmsReceiver" 
+              android:exported="true"
+              android:permission="android.permission.BROADCAST_SMS">
+        <intent-filter android:priority="1000">
+            <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+        </intent-filter>
+    </receiver>
+</application>
+```
+
+#### Permission Management
+```dart
+// lib/services/permission_service.dart
+class PermissionService {
+  Future<bool> requestSmsPermissions() async {
+    final status = await Permission.sms.request();
+    return status.isGranted;
+  }
+  
+  Future<bool> checkSmsPermissions() async {
+    return await Permission.sms.isGranted;
+  }
+}
+```
+
+#### Implementation Steps
+
+1. **Create Native Android Files**:
+   - `SmsReceiver.kt` - SMS message detection and parsing
+   - `SmsChannelHandler.kt` - Platform channel communication
+   - Update `AndroidManifest.xml` with permissions and receiver
+
+2. **Update Flutter Services**:
+   - Modify `SmsService` to use platform channels
+   - Add permission handling
+   - Implement payment queue management
+
+3. **Integration Points**:
+   - Activation page requests SMS permissions
+   - Wallet page starts/stops SMS monitoring
+   - Payment queue widget receives parsed payments
+
+#### Advantages of Platform Channels Approach
+
+✅ **Real-time SMS Detection**: Native Android can detect SMS immediately
+✅ **Background Processing**: Works even when app is in background
+✅ **Proper Permissions**: Uses Android's native SMS permission system
+✅ **Message Parsing**: Full control over SMS content parsing
+✅ **Battery Efficient**: Native Android SMS handling is optimized
+✅ **Security**: Proper Android permission model
+
+#### Migration from flutter_sms
+
+**Current Issues with flutter_sms**:
+- Only supports sending SMS, not receiving
+- No real-time monitoring capabilities
+- Limited to foreground app usage
+- Doesn't integrate with Android's SMS system properly
+
+**Required Changes**:
+1. Remove `flutter_sms` dependency from `pubspec.yaml`
+2. Implement platform channels with native Android code
+3. Update SMS service to use native monitoring
+4. Add proper permission handling
+5. Implement background SMS processing
+
+#### Testing Strategy
+
+1. **Unit Tests**: Test SMS parsing logic with sample messages
+2. **Integration Tests**: Test platform channel communication
+3. **Permission Tests**: Verify permission request flow
+4. **Background Tests**: Test SMS detection when app is backgrounded
+5. **Edge Cases**: Handle malformed SMS, spam messages, etc.
+
+#### Security Considerations
+
+- SMS permissions require user consent
+- Payment message validation to prevent spoofing
+- Secure storage of parsed payment data
+- Rate limiting to prevent spam processing
+- User confirmation before processing payments
 
 ### Stage 4: Payment Extension Integration
 - **Message Parsing**: Handle payment extension APK communication

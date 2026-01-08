@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/micro_server_service.dart';
-import '../services/activation_service.dart';
 import '../services/heartbeat_service.dart';
+import '../services/secure_network_discovery_service.dart';
 
 class ActivationPage extends StatefulWidget {
   final VoidCallback? onActivationSuccess;
@@ -24,26 +25,67 @@ class _ActivationPageState extends State<ActivationPage> {
   final TextEditingController _activationCodeController = TextEditingController();
   final TextEditingController _deviceNameController = TextEditingController();
   final TextEditingController _serverIpController = TextEditingController();
-  String _statusMessage = 'Enter activation code';
+  String _statusMessage = 'Discovering BluPOS server...';
   bool _isActivating = false;
-  bool _isDiscovering = false;
-  String? _deviceUid;
-  String? _discoveredServer;
+  bool _serverDiscovered = false;
+  SecureNetworkDiscoveryService? _discoveryService;
 
   @override
   void initState() {
     super.initState();
     _deviceNameController.text = 'BluPOS Wallet ${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
-    _loadServerIp();
-    _startServerDiscovery();
+    _initializeNetworkDiscovery();
+  }
+
+  Future<void> _initializeNetworkDiscovery() async {
+    try {
+      // Initialize network discovery service
+      _discoveryService = SecureNetworkDiscoveryService();
+      await _discoveryService!.initialize();
+      await _discoveryService!.startDiscovery();
+
+      // Listen for discovered servers
+      _discoverySubscription = _discoveryService!.discoveredServers.listen((servers) {
+        if (servers.isNotEmpty && !_serverDiscovered) {
+          final bestServer = _discoveryService!.getBestServer();
+          if (bestServer != null) {
+            setState(() {
+              _serverIpController.text = bestServer.ipAddress; // Just IP, no port
+              _serverDiscovered = true;
+              _statusMessage = 'Server found. Enter activation code.';
+              print('✅ Auto-discovered server: ${bestServer.ipAddress}:${bestServer.port}');
+            });
+          }
+        }
+      });
+
+      print('🔍 Network discovery started - waiting for server broadcast...');
+
+      // Set timeout for discovery
+      Future.delayed(const Duration(seconds: 10), () {
+        if (!mounted || _serverDiscovered) return;
+        setState(() {
+          _statusMessage = 'No server found. Please ensure BluPOS server is running.';
+        });
+      });
+
+    } catch (e) {
+      print('❌ Network discovery failed: $e');
+      setState(() {
+        _statusMessage = 'Discovery failed. Please restart the app.';
+      });
+    }
   }
 
   Future<void> _loadServerIp() async {
     final prefs = await SharedPreferences.getInstance();
-    final savedIp = prefs.getString('server_ip') ?? 'localhost:8080';
-    setState(() {
-      _serverIpController.text = savedIp;
-    });
+    final savedIp = prefs.getString('server_ip');
+    if (savedIp != null && savedIp.isNotEmpty) {
+      setState(() {
+        _serverIpController.text = savedIp;
+      });
+    }
+    // If no saved IP, leave empty for auto-discovery
   }
 
   Future<void> _saveServerIp(String ip) async {
@@ -53,7 +95,6 @@ class _ActivationPageState extends State<ActivationPage> {
 
   Future<void> _startServerDiscovery() async {
     setState(() {
-      _isDiscovering = true;
       _statusMessage = 'Checking micro-server status...';
     });
 
@@ -62,7 +103,6 @@ class _ActivationPageState extends State<ActivationPage> {
 
     if (MicroServerService.isRunning) {
       setState(() {
-        _discoveredServer = 'localhost:${MicroServerService.PORT}';
         _statusMessage = 'Micro-server is running. Ready to activate.';
       });
     } else {
@@ -70,10 +110,6 @@ class _ActivationPageState extends State<ActivationPage> {
         _statusMessage = 'Micro-server not running. Please restart the app.';
       });
     }
-
-    setState(() {
-      _isDiscovering = false;
-    });
   }
 
   void _onActivatePressed() async {
@@ -216,66 +252,7 @@ class _ActivationPageState extends State<ActivationPage> {
     }
   }
 
-  Future<Map<String, dynamic>> _validateLicenseWithWeb(String licenseKey, String accountId, String masterServer) async {
-    try {
-      final url = Uri.parse('$masterServer/validate_license');
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'license_key': licenseKey,
-          'account_id': accountId,
-          'device_info': {
-            'model': 'Flutter APK',
-            'os_version': 'Android',
-            'app_version': '1.0.0'
-          }
-        }),
-      );
 
-      if (response.statusCode == 200) {
-        final result = jsonDecode(response.body);
-        if (result['status'] == 'success') {
-          // Start heartbeat service after successful validation
-          try {
-            await HeartbeatService.startHeartbeat(
-              accountId: accountId,
-              licenseKey: licenseKey,
-            );
-            print('✅ Heartbeat service started after successful activation');
-          } catch (e) {
-            print('⚠️ Failed to start heartbeat service: $e');
-          }
-
-          return {'success': true, 'message': 'License validated successfully'};
-        } else {
-          return {'success': false, 'message': result['message'] ?? 'License validation failed'};
-        }
-      } else {
-        return {'success': false, 'message': 'Web server error: ${response.statusCode}'};
-      }
-    } catch (e) {
-      return {'success': false, 'message': 'Connection to web system failed: $e'};
-    }
-  }
-
-  Future<void> _requestSmsPermission() async {
-    // TODO: Implement SMS permission request
-    setState(() {
-      _statusMessage = 'SMS permissions requested';
-    });
-  }
-
-  Future<void> _startMicroServer() async {
-    // TODO: Implement micro-server startup
-    setState(() {
-      _statusMessage = 'Micro-server started';
-    });
-  }
-
-  void _updateServerStatus() {
-    // TODO: Update server status indicator
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -354,46 +331,53 @@ class _ActivationPageState extends State<ActivationPage> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Server IP Input Field
-                    TextFormField(
-                      controller: _serverIpController,
-                      decoration: InputDecoration(
-                        labelText: 'BluPOS Server IP:Port',
-                        labelStyle: const TextStyle(
-                          fontSize: 14,
-                          color: Colors.black54,
+                    // Only show fields after server discovery
+                    if (_serverDiscovered) ...[
+                      // Server IP Input Field (Read-only, shown after discovery)
+                      TextFormField(
+                        controller: _serverIpController,
+                        decoration: InputDecoration(
+                          labelText: 'BluPOS Server IP',
+                          labelStyle: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.black54,
+                          ),
+                          border: const OutlineInputBorder(),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          floatingLabelBehavior: FloatingLabelBehavior.auto,
+                          filled: true,
+                          fillColor: Colors.grey.shade100,
                         ),
-                        border: const OutlineInputBorder(),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                        floatingLabelBehavior: FloatingLabelBehavior.auto,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 14),
+                        readOnly: true, // Make the field unmodifiable
+                        enabled: false, // Disable interaction
                       ),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                    const SizedBox(height: 12),
+                      const SizedBox(height: 12),
 
-                    // Activation Code Input Field
-                    TextFormField(
-                      controller: _activationCodeController,
-                      decoration: const InputDecoration(
-                        labelText: 'Activation Code',
-                        labelStyle: TextStyle(
-                          fontSize: 14,
-                          color: Colors.black54,
+                      // Activation Code Input Field (shown after IP discovery)
+                      TextFormField(
+                        controller: _activationCodeController,
+                        decoration: const InputDecoration(
+                          labelText: 'Activation Code',
+                          labelStyle: TextStyle(
+                            fontSize: 14,
+                            color: Colors.black54,
+                          ),
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          floatingLabelBehavior: FloatingLabelBehavior.auto,
                         ),
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                        floatingLabelBehavior: FloatingLabelBehavior.auto,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 14),
                       ),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 14),
-                    ),
+                    ],
                     const SizedBox(height: 16),
                     Text(
                       _statusMessage,
@@ -471,8 +455,12 @@ class _ActivationPageState extends State<ActivationPage> {
     );
   }
 
+  StreamSubscription<List<SecureServerInfo>>? _discoverySubscription;
+
   @override
   void dispose() {
+    _discoverySubscription?.cancel();
+    _discoveryService?.stopDiscovery();
     _activationCodeController.dispose();
     _serverIpController.dispose();
     super.dispose();

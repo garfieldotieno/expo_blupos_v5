@@ -962,20 +962,25 @@ def get_latest_payments():
     # Allow access for APK interface without session authentication
     # This endpoint is for APK data display, not web interface
     try:
-        # Get latest 4 sales records ordered by creation date
+        # Get latest 4 sales records ordered by creation date (latest first)
         latest_payments = SaleRecord.query.order_by(SaleRecord.created_at.desc()).limit(4).all()
 
         payments_data = []
         for record in latest_payments:
+            # Adjust datetime by adding 2 hours (backend time sync)
+            adjusted_datetime = record.created_at + timedelta(hours=2)
+
             payments_data.append({
                 "transaction_id": record.uid,
                 "sales_person": record.sale_clerk,
                 "amount": "{:.2f}".format(record.sale_paid_amount),
                 "balance": "{:.2f}".format(record.sale_balance),
                 "payment_type": record.payment_method or "Cash",
-                "datetime": record.created_at.strftime('%Y-%m-%d %H:%M'),
+                "datetime": adjusted_datetime.strftime('%Y-%m-%d %H:%M'),
                 "checkout_id": str(record.id)
             })
+
+        print(f"📊 Returned {len(payments_data)} latest payments (chronologically ordered: latest first)")
 
         return jsonify({
             "status": "success",
@@ -2429,6 +2434,259 @@ def download_sale_receipt(sale_id):
     response.headers['Content-Disposition'] = f'attachment; filename=receipt_{sale_record.uid}.pdf'
     return response
 
+# SMS Processing Endpoints (Integrated into Main Backend)
+@app.route('/api/sms/process', methods=['POST'])
+def process_incoming_sms():
+    """Process incoming SMS payment notification"""
+    try:
+        data = request.get_json()
+        channel = data.get('channel')
+        message = data.get('message')
+        
+        if not channel or not message:
+            return jsonify({'status': 'error', 'message': 'Missing channel or message'}), 400
+        
+        # Get current pending checkout (only one allowed at a time)
+        pending_checkout = get_current_pending_checkout()
+        
+        if pending_checkout:
+            # Add payment to queue for clerk selection
+            payment_entry = {
+                'id': f"payment_{datetime.now().timestamp()}",
+                'payment_data': {
+                    'channel': channel,
+                    'message': message,
+                    'received_at': datetime.now()
+                },
+                'pending_checkout': {
+                    'id': pending_checkout.id,
+                    'uid': pending_checkout.uid,
+                    'remaining_balance': pending_checkout.sale_balance,
+                    'payment_amount': 0,  # Will be parsed from message
+                    'balance_after_payment': pending_checkout.sale_balance
+                },
+                'received_at': datetime.now(),
+                'status': 'queued'
+            }
+            
+            # Store payment queue in session or global variable for now
+            if not hasattr(app, 'payment_queue'):
+                app.payment_queue = []
+            
+            app.payment_queue.append(payment_entry)
+            
+            return jsonify({
+                'status': 'queued',
+                'action': 'payment_queued',
+                'payment_id': payment_entry['id'],
+                'queue_length': len(app.payment_queue),
+                'message': f'Payment queued. {len(app.payment_queue)} payment(s) waiting for selection.'
+            })
+        else:
+            # No pending checkout - create pending payment for manual review
+            return create_pending_payment({
+                'channel': channel,
+                'message': message,
+                'received_at': datetime.now()
+            })
+            
+    except Exception as e:
+        print(f"Error processing SMS payment: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/sms/reconcile', methods=['POST'])
+def reconcile_sms_payment():
+    """Reconcile SMS payment with existing sales record"""
+    try:
+        data = request.get_json()
+        payment_id = data.get('payment_id')
+        clerk_confirmation = data.get('clerk_confirmation', False)
+        
+        if not payment_id:
+            return jsonify({'status': 'error', 'message': 'Missing payment_id'}), 400
+        
+        # Get payment from queue
+        if not hasattr(app, 'payment_queue'):
+            app.payment_queue = []
+        
+        selected_payment = None
+        for payment in app.payment_queue:
+            if payment['id'] == payment_id:
+                selected_payment = payment
+                break
+        
+        if not selected_payment:
+            return jsonify({'status': 'error', 'message': 'Payment not found in queue'}), 404
+        
+        # Get pending checkout
+        pending_checkout = get_current_pending_checkout()
+        if not pending_checkout:
+            return jsonify({'status': 'error', 'message': 'No pending checkout found'}), 404
+        
+        if not clerk_confirmation:
+            # Remove payment from queue
+            app.payment_queue = [p for p in app.payment_queue if p['id'] != payment_id]
+            return jsonify({
+                'status': 'rejected',
+                'action': 'payment_rejected',
+                'queue_length': len(app.payment_queue),
+                'message': 'Payment rejected and removed from queue'
+            })
+        
+        # Update sale record
+        pending_checkout.sale_paid_amount += 0  # Will be parsed from message
+        pending_checkout.sale_balance = max(0, pending_checkout.sale_balance)
+        pending_checkout.updated_at = datetime.now()
+        
+        # Remove payment from queue
+        app.payment_queue = [p for p in app.payment_queue if p['id'] != payment_id]
+        
+        # Determine if sale is completed
+        if pending_checkout.sale_balance <= 0:
+            pending_checkout.sale_balance = 0
+            pending_checkout.checkout_status = 'COMPLETED'
+            unblock_sales = True
+        else:
+            pending_checkout.checkout_status = 'PENDING_PAYMENT'
+            unblock_sales = False
+        
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'action': 'payment_confirmed',
+            'sale_id': pending_checkout.id,
+            'sale_uid': pending_checkout.uid,
+            'amount_reconciled': 0,  # Will be parsed from message
+            'remaining_balance': pending_checkout.sale_balance,
+            'unblock_sales': unblock_sales,
+            'queue_length': len(app.payment_queue),
+            'message': f'Payment confirmed. Remaining balance: KES {pending_checkout.sale_balance}'
+        })
+        
+    except Exception as e:
+        print(f"Error confirming payment match: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/sms/status', methods=['GET'])
+def get_sms_status():
+    """Get SMS processing status and statistics"""
+    try:
+        if not hasattr(app, 'payment_queue'):
+            app.payment_queue = []
+        
+        pending_checkout = get_current_pending_checkout()
+        
+        return jsonify({
+            'status': 'success',
+            'queue_length': len(app.payment_queue),
+            'pending_checkout': pending_checkout is not None,
+            'pending_checkout_details': pending_checkout.to_dict() if pending_checkout else None,
+            'message': 'SMS processing status retrieved successfully'
+        })
+        
+    except Exception as e:
+        print(f"Error in /api/sms/status: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/sms/select-payment', methods=['POST'])
+def select_payment():
+    """Select payment from queue for reconciliation"""
+    try:
+        data = request.get_json()
+        payment_id = data.get('payment_id')
+        
+        if not payment_id:
+            return jsonify({'status': 'error', 'message': 'Missing payment_id'}), 400
+        
+        # Get payment from queue
+        if not hasattr(app, 'payment_queue'):
+            app.payment_queue = []
+        
+        selected_payment = None
+        for payment in app.payment_queue:
+            if payment['id'] == payment_id:
+                selected_payment = payment
+                break
+        
+        if not selected_payment:
+            return jsonify({
+                'status': 'error',
+                'message': 'Payment not found in queue'
+            }), 404
+        
+        # Get pending checkout
+        pending_checkout = get_current_pending_checkout()
+        if not pending_checkout:
+            return jsonify({
+                'status': 'error',
+                'message': 'No pending checkout found'
+            }), 404
+        
+        return jsonify({
+            'status': 'success',
+            'action': 'show_payment_details',
+            'payment_data': selected_payment['payment_data'],
+            'pending_checkout': selected_payment['pending_checkout'],
+            'message': 'Payment selected for reconciliation'
+        })
+        
+    except Exception as e:
+        print(f"Error in /api/sms/select-payment: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/sms/queue', methods=['GET'])
+def get_payment_queue():
+    """Get current payment queue"""
+    try:
+        if not hasattr(app, 'payment_queue'):
+            app.payment_queue = []
+        
+        return jsonify({
+            'status': 'success',
+            'queue': app.payment_queue,
+            'queue_length': len(app.payment_queue)
+        })
+        
+    except Exception as e:
+        print(f"Error in /api/sms/queue: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/sms/test', methods=['POST'])
+def test_sms_processing():
+    """Test endpoint for SMS processing"""
+    try:
+        # Test SMS messages
+        test_messages = [
+            {
+                'channel': '80872',
+                'message': 'Payment Of Kshs 130.00 Has Been Received By Jaystar Investments Ltd For Account 80872, From Jane Doe on 26/12/25 at 06.49pm'
+            },
+            {
+                'channel': '57938',
+                'message': 'Dear Jeffithah, Your merchant account 57938 has been credited with KES 50.00 ref #TLQ4G2B2YR from John Doe 254717xxx123 on 26-Dec-2025 15:27:17.'
+            }
+        ]
+        
+        results = []
+        for test_msg in test_messages:
+            result = process_incoming_sms()
+            results.append({
+                'channel': test_msg['channel'],
+                'status': result.get_json()['status'],
+                'message': result.get_json()['message']
+            })
+        
+        return jsonify({
+            'status': 'success',
+            'test_results': results,
+            'message': 'SMS processing test completed'
+        })
+        
+    except Exception as e:
+        print(f"Error in /api/sms/test: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 # Micro-Server API Endpoints for APK Integration
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -2444,6 +2702,17 @@ def health_check():
 def generate_activation_qr():
     """Generate QR code for device activation (first-time activation)"""
     try:
+        # Use fixed server IP for BluPOS deployment
+        fixed_server_ip = "192.168.0.102"
+        server_port = int(os.environ.get('PORT', 8080))
+
+        server_info = {
+            "local_ip": fixed_server_ip,
+            "external_ip": fixed_server_ip,
+            "port": server_port,
+            "url": f"http://{fixed_server_ip}:{server_port}"
+        }
+
         # Generate activation code - randomly choose between full and half license
         license_types = [
             ('BLU', 183, 'Half License (183 days)'),  # BLU prefix for half license
@@ -2456,6 +2725,7 @@ def generate_activation_qr():
 
         # Generate QR code data for APK activation
         qr_data = f"""BluPOS Device Activation
+Server IP: {fixed_server_ip}:{server_port}
 Activation Code: {activation_code}
 License Type: {description}
 Duration: {days} days
@@ -2482,7 +2752,8 @@ System: BluPOS Point of Sale"""
             "license_days": days,
             "license_type": description,
             "qr_code": qr_data_url,
-            "instructions": "Scan this QR code with the BluPOS APK to activate your device"
+            "server_info": server_info,
+            "instructions": f"Connect to server at {local_ip}:{server_port}, then scan QR code with BluPOS APK"
         })
 
     except Exception as e:
@@ -3177,15 +3448,15 @@ class SecureNetworkDiscoveryService:
                 self.session_expiry = now + timedelta(seconds=self.session_rotation_interval)
                 print(f"🔄 Generated new session key, expires at {self.session_expiry}")
             
-            # Create server info
+            # Create server info with fixed IP
             server_info = {
                 'server_type': 'blupos_backend',
-                'ip_address': '0.0.0.0',  # Will be resolved by clients
+                'ip_address': '192.168.0.102',  # Fixed server IP
                 'port': self.port,
                 'server_name': 'BluPOS Backend Server',
                 'last_seen': now.isoformat(),
                 'timestamp': int(now.timestamp()),
-                'url': f'http://0.0.0.0:{self.port}'
+                'url': f'http://192.168.0.102:{self.port}'
             }
             
             # Encrypt server info

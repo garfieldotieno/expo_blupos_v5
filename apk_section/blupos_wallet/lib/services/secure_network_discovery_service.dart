@@ -120,6 +120,9 @@ class SecureNetworkDiscoveryService {
   bool _isInitialized = false;
   bool _isRunning = false;
 
+  // Control verbose logging for debugging
+  static bool _verboseLogging = true;
+
   // Singleton instance
   static final SecureNetworkDiscoveryService _instance = SecureNetworkDiscoveryService._internal();
   factory SecureNetworkDiscoveryService() => _instance;
@@ -252,16 +255,16 @@ class SecureNetworkDiscoveryService {
         _sessionExpiry = await SecureKeyManager.getSessionExpiry();
       }
 
-      // Create server info
-      final serverInfo = SecureServerInfo(
-        serverType: 'blupos_backend',
-        ipAddress: await _getLocalIp(),
-        port: 8080,
-        serverName: 'BluPOS Backend Server',
-        lastSeen: DateTime.now(),
-        timestamp: DateTime.now().millisecondsSinceEpoch,
-        url: 'http://${await _getLocalIp()}:8080',
-      );
+    // Create server info with fixed IP (should match backend broadcast)
+    final serverInfo = SecureServerInfo(
+      serverType: 'blupos_backend',
+      ipAddress: '192.168.0.102',  // Use the same IP as backend broadcast
+      port: 8080,
+      serverName: 'BluPOS Backend Server',
+      lastSeen: DateTime.now(),
+      timestamp: DateTime.now().millisecondsSinceEpoch,
+      url: 'http://192.168.0.102:8080',
+    );
 
       // Encrypt server info
       final encryptedServerInfo = await SecureKeyManager.encryptData(
@@ -430,6 +433,21 @@ class SecureNetworkDiscoveryService {
     final random = encrypt.Key.fromLength(16);
     return base64Encode(random.bytes);
   }
+
+  /// Enable verbose logging for debugging
+  static void enableVerboseLogging() {
+    _verboseLogging = true;
+    print('📡 [DISCOVERY] Verbose logging enabled');
+  }
+
+  /// Disable verbose logging to reduce log noise
+  static void disableVerboseLogging() {
+    _verboseLogging = false;
+    print('📡 [DISCOVERY] Verbose logging disabled');
+  }
+
+  /// Check if verbose logging is enabled
+  static bool get isVerboseLogging => _verboseLogging;
 
   /// Dispose resources
   Future<void> dispose() async {

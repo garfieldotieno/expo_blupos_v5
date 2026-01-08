@@ -218,6 +218,17 @@
                         <div id="selected-license-info" style="margin-bottom: 20px;">
                             <!-- Selected license button will be shown here -->
                         </div>
+
+                        <!-- Server Network Information - Displayed before QR code -->
+                        <div id="server-network-info" style="margin-bottom: 20px; padding: 15px; background-color: rgba(255,255,255,0.9); border-radius: 8px; border: 2px solid #333;">
+                            <div style="color: #333; font-size: 14px; font-weight: bold; margin-bottom: 10px;">
+                                🔗 BluPOS Server Connection
+                            </div>
+                            <div id="server-ip-display" style="color: #666; font-size: 12px; font-family: monospace; text-align: center; font-weight: bold;">
+                                Loading server information...
+                            </div>
+                        </div>
+
                         <div id="qr-code-container">
                             <!-- QR code will be shown here -->
                         </div>
@@ -2336,6 +2347,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.querySelector('#license-selection').style.display = 'none';
                 document.querySelector('#license-qr-display').style.display = 'block';
 
+                // Update server network information display
+                updateServerNetworkInfo(result.server_info);
+
                 // Update selected license info
                 const selectedInfo = document.querySelector('#selected-license-info');
                 selectedInfo.innerHTML = `
@@ -2403,6 +2417,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 `;
 
+                // Update server network information display after a short delay to ensure element is visible
+                console.log('📡 About to update server info with:', result.server_info);
+                setTimeout(() => {
+                    console.log('⏰ Timeout executed, calling updateServerNetworkInfo');
+                    updateServerNetworkInfo(result.server_info);
+                }, 100);
+
                 // Update QR code display for activation
                 const qrContainer = document.querySelector('#qr-code-container');
                 qrContainer.innerHTML = `
@@ -2463,6 +2484,39 @@ document.addEventListener('DOMContentLoaded', function() {
             license366Btn.onclick = function() {
                 selectLicense(366);
             };
+        }
+    }
+
+    // Update server network information display
+    function updateServerNetworkInfo(serverInfo) {
+        console.log('🔗 Updating server network info display:', serverInfo);
+
+        const serverIpElement = document.querySelector('#server-ip-display');
+        console.log('🔗 Server IP element found:', !!serverIpElement);
+        console.log('🔗 Server IP element visibility:', serverIpElement ? getComputedStyle(serverIpElement).display : 'N/A');
+
+        if (serverIpElement) {
+            let serverIp = '192.168.0.102'; // Default fallback IP
+
+            if (serverInfo) {
+                // Use server info if available
+                serverIp = serverInfo.local_ip || serverInfo.external_ip || serverIp;
+                console.log('✅ Using server info IP:', serverIp);
+            } else {
+                console.log('⚠️ No server info provided, using fallback IP:', serverIp);
+            }
+
+            // Display just the server IP address without port
+            const displayText = `Use this server: ${serverIp}`;
+
+            serverIpElement.innerHTML = displayText;
+            serverIpElement.style.color = '#007bff'; // Make it blue to stand out
+            serverIpElement.style.fontWeight = 'bold';
+            serverIpElement.style.fontSize = '14px';
+            console.log('✅ Server IP displayed:', displayText);
+        } else {
+            console.error('❌ Server IP display element not found');
+            console.log('❌ Element not found at all');
         }
     }
 

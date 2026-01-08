@@ -1,24 +1,22 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:printing/printing.dart';
-import 'package:pdf/pdf.dart' as pw;
 import 'package:intl/intl.dart';
 import 'pages/activation_page.dart';
-import 'pages/wallet_page.dart';
 import 'utils/api_client.dart';
 import 'services/micro_server_service.dart';
 import 'services/heartbeat_service.dart';
 import 'services/network_discovery_service.dart';
-import 'services/network_discovery_service.dart' show DiscoveredServer;
-import 'services/secure_key_manager.dart';
 import 'services/secure_network_discovery_service.dart';
-import 'services/secure_network_discovery_service.dart' show SecureServerInfo;
+import 'services/sms_service.dart';
+import 'widgets/blinking_sms_icon.dart';
+import 'widgets/sms_indicator.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -89,10 +87,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   bool _isLoading = true;
   String _expiryDateDisplay = '--/--/----';
   String _accountIdDisplay = 'Not Activated';
-  int _checkCounter = 0;
   bool _isSyncing = false;
 
-
+  // SMS service for blinking animation
+  late final SmsService _smsService;
+  late StreamSubscription<void> _smsArrivalSubscription;
+  late StreamSubscription<int> _unreadCountSubscription;
+  bool _showBlinkingSms = false;
+  int _currentUnreadCount = 0;
+  double _totalSales = 0.0;
 
   // Network discovery service
   final NetworkDiscoveryService _networkDiscovery = NetworkDiscoveryService();
@@ -101,6 +104,57 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    _initializeServices();
+  }
+
+  Future<void> _initializeServices() async {
+    // Initialize SMS service
+    print('📱 [SMS] Initializing SMS service...');
+    _smsService = SmsService();
+    await _smsService.initialize(); // ← CRITICAL: This was missing!
+    print('✅ [SMS] SMS service initialized successfully');
+
+    // Listen for SMS arrival (for initial trigger)
+    print('👂 [SMS] Setting up SMS arrival listener...');
+    _smsArrivalSubscription = _smsService.onSmsArrival.listen((_) {
+      print('📨 [SMS] SMS arrival detected - triggering blink animation');
+      if (mounted) {
+        setState(() {
+          _showBlinkingSms = true;
+        });
+      }
+    });
+    print('✅ [SMS] SMS arrival listener active');
+
+    // Listen for unread count changes (for continuous blinking)
+    print('🔢 [SMS] Setting up unread count change listener...');
+    _unreadCountSubscription = _smsService.onUnreadCountChanged.listen((count) {
+      print('📊 [SMS] MAIN LISTENER: Unread count changed: $count messages');
+      if (mounted) {
+        // Use post-frame callback to ensure UI thread safety
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            print('🔄 [SMS] MAIN LISTENER: Updating UI with unread count: $count');
+            setState(() {
+              _currentUnreadCount = count;
+              _showBlinkingSms = count > 0;
+              print('🎯 [SMS] MAIN LISTENER: UI state updated - _currentUnreadCount: $_currentUnreadCount, _showBlinkingSms: $_showBlinkingSms');
+            });
+          }
+        });
+      }
+    });
+    print('✅ [SMS] Unread count listener active');
+
+    // Initialize UI with current count directly
+    print('🔄 [SMS] Initializing UI with current unread count...');
+    if (mounted) {
+      setState(() {
+        _currentUnreadCount = _smsService.unreadSmsCount;
+        _showBlinkingSms = _currentUnreadCount > 0;
+        print('🎯 [SMS] UI initialized with unread count: $_currentUnreadCount, blinking: $_showBlinkingSms');
+      });
+    }
 
     _startNetworkDiscovery();
     _loadAppState();
@@ -108,6 +162,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _smsArrivalSubscription.cancel();
+    _unreadCountSubscription.cancel();
     _discoverySubscription.cancel();
     _networkDiscovery.stopDiscovery();
     super.dispose();
@@ -118,7 +174,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   // Start network discovery and listen for discovered servers
   void _startNetworkDiscovery() {
     try {
-      print('🔍 [MAIN] Starting network discovery integration...');
+      // Disable verbose network discovery logging to reduce log noise during SMS debugging
+      SecureNetworkDiscoveryService.disableVerboseLogging();
+      print('🔍 [MAIN] Starting network discovery integration (verbose logging disabled)...');
       _networkDiscovery.startDiscovery();
       
       _discoverySubscription = _networkDiscovery.discoveredServers.listen((servers) {
@@ -188,113 +246,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     }
   }
 
-  Future<void> _checkForExternalStateChanges() async {
-    _checkCounter++;
 
-    final prefs = await SharedPreferences.getInstance();
-    final currentActivated = prefs.getBool('isActivated') ?? false;
-    final currentExpiry = prefs.getString('licenseExpiry');
-    final currentAccountId = prefs.getString('persistentAccountId');
-
-    // Check if state has changed externally
-    bool stateChanged = false;
-    AppState newState;
-
-    if (!currentActivated && _appState != AppState.firstTime) {
-      newState = AppState.firstTime;
-      stateChanged = true;
-    } else if (currentActivated && currentExpiry != null) {
-      final expiryDate = DateTime.tryParse(currentExpiry);
-      if (expiryDate != null && expiryDate.isBefore(DateTime.now())) {
-        newState = AppState.expired;
-      } else {
-        newState = AppState.active;
-      }
-      if (newState != _appState) {
-        stateChanged = true;
-      }
-    } else if (currentActivated && _appState != AppState.active) {
-      newState = AppState.active;
-      stateChanged = true;
-    }
-
-    // Also check if expiry date changed (even if state stays the same)
-    // This handles cases where license type changes but state remains active
-    String currentExpiryDisplay = '--/--/----';
-    if (currentExpiry != null) {
-      final expiryDate = DateTime.tryParse(currentExpiry);
-      if (expiryDate != null) {
-        currentExpiryDisplay = '${expiryDate.month.toString().padLeft(2, '0')}/${expiryDate.day.toString().padLeft(2, '0')}/${expiryDate.year}';
-      }
-    }
-
-    if (currentExpiryDisplay != _expiryDateDisplay) {
-      print('📅 Expiry date changed externally: $_expiryDateDisplay → $currentExpiryDisplay');
-      stateChanged = true;
-    }
-
-    // Periodically check BluPOS health and sync state (every 20 checks = ~10 seconds)
-    if (_checkCounter % 20 == 0) {
-      try {
-        setState(() => _isSyncing = true);
-        final bluposState = await _syncWithBluPOS();
-        setState(() => _isSyncing = false);
-
-        if (bluposState != null && bluposState['status'] == 'success') {
-          final bluposAppState = bluposState['app_state'];
-          final bluposExpiry = bluposState['license_expiry'];
-          final bluposAccountId = bluposState['account_id'];
-
-          // Check if BluPOS state differs from current state
-          bool bluposStateChanged = false;
-
-          // Update account ID if different
-          if (bluposAccountId != null && bluposAccountId != currentAccountId) {
-            await prefs.setString('persistentAccountId', bluposAccountId);
-            print('🔄 Synced account ID with BluPOS: $bluposAccountId');
-            bluposStateChanged = true;
-          }
-
-          // Update expiry if different
-          if (bluposExpiry != null && bluposExpiry != currentExpiry) {
-            await prefs.setString('licenseExpiry', bluposExpiry);
-            print('🔄 Synced expiry date with BluPOS: $bluposExpiry');
-            bluposStateChanged = true;
-          }
-
-          // Update activation state based on BluPOS
-          if (bluposAppState == 'active' && !currentActivated) {
-            await prefs.setBool('isActivated', true);
-            print('🔄 Activated license based on BluPOS state');
-            bluposStateChanged = true;
-          } else if (bluposAppState == 'expired' && currentActivated) {
-            await prefs.setBool('isActivated', false);
-            print('🔄 Deactivated license based on BluPOS state');
-            bluposStateChanged = true;
-          } else if (bluposAppState == 'first_time' && currentActivated) {
-            await prefs.setBool('isActivated', false);
-            await prefs.remove('licenseExpiry');
-            print('🔄 Reset to first-time based on BluPOS state');
-            bluposStateChanged = true;
-          }
-
-          if (bluposStateChanged) {
-            print('🔄 BluPOS state sync completed, reloading UI...');
-            await _loadAppState();
-            return; // Don't check local state changes since we just reloaded
-          }
-        }
-      } catch (e) {
-        print('❌ BluPOS sync failed: $e');
-      }
-    }
-
-    // If state changed externally, reload the full state
-    if (stateChanged) {
-      print('🔄 External state change detected, reloading UI...');
-      await _loadAppState();
-    }
-  }
 
   Future<void> _loadAppState() async {
     try {
@@ -474,10 +426,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           await prefs.setString('real_balance', balanceValue.toString());
           print('💰 Stored real balance: $balanceValue');
 
-          // Update UI immediately if we're on the main screen
-          if (mounted && !_isLoading) {
+          // Update total sales for SMS indicator
+          final parsedBalanceValue = double.tryParse(balanceValue.toString()) ?? 0.0;
+          if (mounted) {
             setState(() {
-              // Force rebuild of balance display
+              _totalSales = parsedBalanceValue;
             });
           }
         } else {
@@ -522,35 +475,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     }
   }
 
-  void _updateDisplayValues(bool isActivated, String? licenseExpiry, String? accountId) {
-    // Format expiry date for display
-    if (licenseExpiry != null) {
-      final expiryDate = DateTime.tryParse(licenseExpiry);
-      if (expiryDate != null) {
-        _expiryDateDisplay = '${expiryDate.month.toString().padLeft(2, '0')}/${expiryDate.day.toString().padLeft(2, '0')}/${expiryDate.year}';
-        print('📅 Synced expiry date: $expiryDate, display: $_expiryDateDisplay');
-      } else {
-        _expiryDateDisplay = '--/--/----';
-        print('❌ Failed to parse synced expiry date: $licenseExpiry');
-      }
-    } else {
-      _expiryDateDisplay = '--/--/----';
-    }
 
-    // Format account ID for display
-    if (accountId != null && accountId.isNotEmpty) {
-      // Extract the numerical part after 'account_' prefix
-      final accountParts = accountId.split('_');
-      if (accountParts.length > 1) {
-        _accountIdDisplay = accountParts.last;
-        print('🆔 Synced account ID display: $_accountIdDisplay');
-      } else {
-        _accountIdDisplay = accountId;
-      }
-    } else {
-      _accountIdDisplay = 'Not Activated';
-    }
-  }
 
   Future<String> _getRealBalanceDisplay() async {
     try {
@@ -580,7 +505,28 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       final realPaymentsJson = prefs.getString('real_payments');
       if (realPaymentsJson != null && realPaymentsJson.isNotEmpty) {
         final payments = jsonDecode(realPaymentsJson) as List<dynamic>;
-        return payments.cast<Map<String, dynamic>>();
+        final paymentsList = payments.cast<Map<String, dynamic>>();
+
+        // Sort chronologically from latest (top) to oldest (bottom)
+        paymentsList.sort((a, b) {
+          final dateA = a['datetime'];
+          final dateB = b['datetime'];
+
+          if (dateA == null && dateB == null) return 0;
+          if (dateA == null) return 1; // null dates go to bottom
+          if (dateB == null) return -1;
+
+          try {
+            final parsedA = DateTime.parse(dateA);
+            final parsedB = DateTime.parse(dateB);
+            return parsedB.compareTo(parsedA); // Latest first
+          } catch (e) {
+            print('⚠️ Error parsing payment dates: $e');
+            return 0;
+          }
+        });
+
+        return paymentsList;
       }
     } catch (e) {
       print('❌ Error getting real payments: $e');
@@ -795,13 +741,17 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                           final paymentType = payment['payment_type'] ?? 'Cash';
                           final transactionId = payment['transaction_id'] ?? 'N/A';
 
-                          // Parse datetime and format display
-                          final timeDisplay = datetime.isNotEmpty
-                              ? DateTime.tryParse(datetime)?.toLocal().toString().split(' ')[1].substring(0, 5) ?? '--:--'
+                          // Parse datetime and format display (add 2 hours for backend time sync)
+                          final adjustedDateTime = datetime.isNotEmpty
+                              ? DateTime.tryParse(datetime)?.add(const Duration(hours: 2))?.toLocal()
+                              : null;
+
+                          final timeDisplay = adjustedDateTime != null
+                              ? adjustedDateTime.toString().split(' ')[1].substring(0, 5)
                               : '--:--';
 
-                          final dateDisplay = datetime.isNotEmpty
-                              ? DateTime.tryParse(datetime)?.toLocal().toString().split(' ')[0] ?? ''
+                          final dateDisplay = adjustedDateTime != null
+                              ? adjustedDateTime.toString().split(' ')[0]
                               : '';
 
                           return Container(
@@ -814,7 +764,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                               border: Border.all(color: Colors.grey.shade200),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
+                                  color: Colors.black.withValues(alpha: 0.05),
                                   blurRadius: 2,
                                   offset: const Offset(0, 1),
                                 ),
@@ -831,7 +781,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                                       'ID: $transactionId',
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: Colors.black.withOpacity(0.6),
+                                        color: Colors.black.withValues(alpha: 0.6),
                                         fontWeight: FontWeight.w500,
                                       ),
                                     ),
@@ -855,7 +805,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                                         '$salesPerson • $paymentType',
                                         style: TextStyle(
                                           fontSize: 12,
-                                          color: Colors.black.withOpacity(0.7),
+                                          color: Colors.black.withValues(alpha: 0.7),
                                         ),
                                         overflow: TextOverflow.ellipsis,
                                       ),
@@ -864,7 +814,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                                       '$dateDisplay $timeDisplay',
                                       style: TextStyle(
                                         fontSize: 11,
-                                        color: Colors.black.withOpacity(0.6),
+                                        color: Colors.black.withValues(alpha: 0.6),
                                       ),
                                     ),
                                   ],
@@ -1032,7 +982,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   borderRadius: BorderRadius.circular(16.0),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 8,
                       offset: const Offset(0, 4),
                     ),
@@ -1065,7 +1015,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     ),
                     const SizedBox(height: 16),
 
-                    // Total Processed Amount (Center)
+                    // Swinging SMS Indicator (always visible, swings between SMS count and sales)
                     const Text(
                       'Total Processed',
                       style: TextStyle(
@@ -1073,18 +1023,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    FutureBuilder<String>(
-                      future: _getRealBalanceDisplay(),
-                      builder: (context, snapshot) {
-                        final balance = snapshot.data ?? (_appState == AppState.firstTime ? 'KES 0.00' : 'KES 0.00');
-                        return Text(
-                          balance,
-                          style: const TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        );
-                      },
+                    SmsIndicator(
+                      unreadCountStream: _smsService.onUnreadCountChanged,
+                      senderType: _currentUnreadCount > 0 ? "Short Code" : "Unknown",
+                      totalSales: _totalSales,
+                      initialUnreadCount: _currentUnreadCount,
                     ),
 
 
