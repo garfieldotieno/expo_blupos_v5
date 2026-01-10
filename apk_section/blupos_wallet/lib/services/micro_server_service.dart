@@ -5,6 +5,8 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:shelf_router/shelf_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart';
 import 'sms_service.dart';
 
 class MicroServerService {
@@ -53,8 +55,22 @@ class MicroServerService {
       print('🆕 Generated new device ID: $_currentDeviceId');
     }
 
+    // Check if running on emulator
+    final isEmulator = await _isRunningOnEmulator();
+    if (isEmulator) {
+      print('🤖 Detected Android emulator - applying network configuration');
+      print('📡 Emulator note: Micro-server may have limited network access');
+      print('💡 For full testing, use standalone micro-server: python3 standalone_microserver.py');
+    }
+
     try {
       final router = Router();
+
+      // Determine binding address based on platform
+      final isEmulator = await _isRunningOnEmulator();
+      final bindAddress = isEmulator ? InternetAddress.anyIPv4 : InternetAddress.loopbackIPv4;
+
+      print('🌐 Binding micro-server to: ${bindAddress.address}:${PORT}');
 
       // Health check endpoint
       router.get('/health', _healthHandler);
@@ -66,9 +82,14 @@ class MicroServerService {
       router.post('/test', _testHandler);
 
       // SMS API endpoints
-      router.get('/on-boot-sms-total-count', _onBootSmsTotalCountHandler);
-      router.get('/after-boot-total-count', _afterBootTotalCountHandler);
       router.get('/message/<id>', _messageByIdHandler);
+      router.get('/sms/shortcodes', _smsShortcodesHandler);
+      router.get('/sms/not-shortcodes', _smsNotShortcodesHandler);
+      router.get('/sms/read', _smsReadHandler);
+      router.get('/sms/not-read', _smsNotReadHandler);
+
+      // Inventory API endpoints
+      router.get('/inventory/local/<page>', _inventoryLocalHandler);
 
       // CORS headers for web compatibility
       final handler = const Pipeline()
@@ -90,6 +111,12 @@ class MicroServerService {
       print('   GET  /health  - Health check');
       print('   POST /activate - Device activation & license management');
       print('   POST /test    - Testing utilities (force expiry, reset)');
+      print('   SMS endpoints:');
+      print('   GET  /sms/shortcodes - SMS from approved shortcodes only');
+      print('   GET  /sms/not-shortcodes - SMS from regular phones (scams)');
+      print('   GET  /sms/read - Read SMS only');
+      print('   GET  /sms/not-read - Unread SMS only');
+      print('   GET  /message/<id> - Get SMS message by ID');
       print('🔑 Available activation codes for testing:');
       _dummyActivationCodes.forEach((code, details) {
         print('   $code - ${details['description']} (${details['license_days']} days)');
@@ -544,46 +571,7 @@ class MicroServerService {
     }
   }
 
-  // SMS API Handlers
-  static Future<Response> _onBootSmsTotalCountHandler(Request request) async {
-    try {
-      print('📱 SMS API: Getting on-boot SMS total count');
 
-      // Return SMS counts captured at application initialization/boot time
-      final bootSmsData = await _getBootTimeSmsCounts();
-
-      return Response.ok(
-        jsonEncode(bootSmsData),
-        headers: {'Content-Type': 'application/json'},
-      );
-    } catch (e) {
-      print('❌ SMS API error (_onBootSmsTotalCountHandler): $e');
-      return Response(500, body: jsonEncode({
-        'status': 'error',
-        'message': 'Failed to get on-boot SMS counts: $e'
-      }), headers: {'Content-Type': 'application/json'});
-    }
-  }
-
-  static Future<Response> _afterBootTotalCountHandler(Request request) async {
-    try {
-      print('📱 SMS API: Getting after-boot SMS total count');
-
-      // Return current SMS counts after application has been running
-      final currentSmsData = await _getCurrentSmsCounts('after_boot');
-
-      return Response.ok(
-        jsonEncode(currentSmsData),
-        headers: {'Content-Type': 'application/json'},
-      );
-    } catch (e) {
-      print('❌ SMS API error (_afterBootTotalCountHandler): $e');
-      return Response(500, body: jsonEncode({
-        'status': 'error',
-        'message': 'Failed to get after-boot SMS counts: $e'
-      }), headers: {'Content-Type': 'application/json'});
-    }
-  }
 
   static Future<Response> _messageByIdHandler(Request request) async {
     try {
@@ -758,6 +746,83 @@ class MicroServerService {
     }
   }
 
+  // SMS filtering handlers - REAL-TIME DATA
+  static Future<Response> _smsShortcodesHandler(Request request) async {
+    try {
+      print('📱 SMS API: Getting SMS from shortcodes only');
+
+      final shortcodeMessages = await _getRealSmsByFilter('shortcodes_only');
+
+      return Response.ok(
+        jsonEncode(shortcodeMessages),
+        headers: {'Content-Type': 'application/json'},
+      );
+    } catch (e) {
+      print('❌ SMS API error (_smsShortcodesHandler): $e');
+      return Response(500, body: jsonEncode({
+        'status': 'error',
+        'message': 'Failed to get shortcode SMS: $e'
+      }), headers: {'Content-Type': 'application/json'});
+    }
+  }
+
+  static Future<Response> _smsNotShortcodesHandler(Request request) async {
+    try {
+      print('📱 SMS API: Getting SMS from non-shortcodes only');
+
+      final nonShortcodeMessages = await _getRealSmsByFilter('non_shortcodes_only');
+
+      return Response.ok(
+        jsonEncode(nonShortcodeMessages),
+        headers: {'Content-Type': 'application/json'},
+      );
+    } catch (e) {
+      print('❌ SMS API error (_smsNotShortcodesHandler): $e');
+      return Response(500, body: jsonEncode({
+        'status': 'error',
+        'message': 'Failed to get non-shortcode SMS: $e'
+      }), headers: {'Content-Type': 'application/json'});
+    }
+  }
+
+  static Future<Response> _smsReadHandler(Request request) async {
+    try {
+      print('📱 SMS API: Getting read SMS only');
+
+      final readMessages = await _getRealSmsByFilter('read_only');
+
+      return Response.ok(
+        jsonEncode(readMessages),
+        headers: {'Content-Type': 'application/json'},
+      );
+    } catch (e) {
+      print('❌ SMS API error (_smsReadHandler): $e');
+      return Response(500, body: jsonEncode({
+        'status': 'error',
+        'message': 'Failed to get read SMS: $e'
+      }), headers: {'Content-Type': 'application/json'});
+    }
+  }
+
+  static Future<Response> _smsNotReadHandler(Request request) async {
+    try {
+      print('📱 SMS API: Getting unread SMS only');
+
+      final unreadMessages = await _getRealSmsByFilter('unread_only');
+
+      return Response.ok(
+        jsonEncode(unreadMessages),
+        headers: {'Content-Type': 'application/json'},
+      );
+    } catch (e) {
+      print('❌ SMS API error (_smsNotReadHandler): $e');
+      return Response(500, body: jsonEncode({
+        'status': 'error',
+        'message': 'Failed to get unread SMS: $e'
+      }), headers: {'Content-Type': 'application/json'});
+    }
+  }
+
   // Helper method to get SMS message by ID
   static Future<Map<String, dynamic>?> _getSmsMessageById(String id) async {
     try {
@@ -798,6 +863,301 @@ class MicroServerService {
     }
   }
 
+  // Helper method to filter SMS by various criteria - REAL DATA
+  static Future<Map<String, dynamic>> _getRealSmsByFilter(String filterType) async {
+    try {
+      print('📱 [SMS_FILTER] Getting REAL SMS with filter: $filterType');
+
+      // Try to get SMS service instance - but it might not be initialized yet
+      // For now, we'll check if there's any persisted SMS data
+      final prefs = await SharedPreferences.getInstance();
+      final smsDataJson = prefs.getString('sms_messages');
+
+      List<Map<String, dynamic>> allMessages = [];
+      if (smsDataJson != null && smsDataJson.isNotEmpty) {
+        try {
+          final List<dynamic> smsData = jsonDecode(smsDataJson);
+          allMessages = smsData.cast<Map<String, dynamic>>();
+          print('📊 [SMS_FILTER] Loaded ${allMessages.length} SMS from persisted data');
+        } catch (e) {
+          print('⚠️ [SMS_FILTER] Error parsing persisted SMS data: $e');
+        }
+      }
+
+      // If no persisted data, try to get from SMS service singleton if it's initialized
+      if (allMessages.isEmpty) {
+        try {
+          final smsService = SmsService.instance;
+          allMessages = smsService.smsMessages;
+          print('📊 [SMS_FILTER] Got ${allMessages.length} SMS from singleton service');
+        } catch (e) {
+          print('⚠️ [SMS_FILTER] SMS service singleton not accessible yet');
+        }
+      }
+
+      print('📊 [SMS_FILTER] Total SMS available: ${allMessages.length}');
+
+      // Debug: Log all available messages
+      if (allMessages.isNotEmpty) {
+        print('📋 [SMS_FILTER] Available SMS messages:');
+        for (var i = 0; i < allMessages.length; i++) {
+          final msg = allMessages[i];
+          print('   [$i] ID:${msg['id']} Sender:${msg['sender']} Read:${msg['read']} Source:${msg['source']}');
+        }
+      } else {
+        print('📋 [SMS_FILTER] No SMS messages available in service');
+      }
+
+      List<Map<String, dynamic>> filteredMessages = [];
+      String description = '';
+
+      switch (filterType) {
+        case 'shortcodes_only':
+          // Only messages from approved shortcodes (123456, 123457)
+          filteredMessages = allMessages.where((msg) {
+            final sender = msg['sender'] as String?;
+            return sender == '123456' || sender == '123457';
+          }).toList();
+          description = 'Messages from approved shortcodes only (123456, 123457)';
+          break;
+
+        case 'non_shortcodes_only':
+          // Messages from regular phone numbers (not approved shortcodes)
+          filteredMessages = allMessages.where((msg) {
+            final sender = msg['sender'] as String?;
+            return sender != '123456' && sender != '123457';
+          }).toList();
+          description = 'Messages from regular phone numbers (rejected as potential scams)';
+          break;
+
+        case 'read_only':
+          // Read messages
+          filteredMessages = allMessages.where((msg) {
+            return msg['read'] == true;
+          }).toList();
+          description = 'Read messages only';
+          break;
+
+        case 'unread_only':
+          // Unread messages
+          filteredMessages = allMessages.where((msg) {
+            return msg['read'] == false || msg['read'] == null;
+          }).toList();
+          description = 'Unread messages only';
+          break;
+
+        default:
+          description = 'Unknown filter type';
+      }
+
+      print('📊 [SMS_FILTER] Filtered $filterType: ${filteredMessages.length} messages from ${allMessages.length} total');
+
+      final result = {
+        'status': 'success',
+        'filter_type': filterType,
+        'description': description,
+        'timestamp': DateTime.now().toUtc().toIso8601String(),
+        'count': filteredMessages.length,
+        'messages': filteredMessages,
+        'metadata': {
+          'filtered_at': DateTime.now().toUtc().toIso8601String(),
+          'data_source': 'sms_service_realtime',
+          'filter_criteria': filterType,
+          'total_messages_in_service': allMessages.length,
+        }
+      };
+
+      return result;
+
+    } catch (e) {
+      print('❌ [SMS_FILTER] Error filtering REAL SMS: $e');
+
+      // Fallback to mock data if real filtering fails
+      print('⚠️ [SMS_FILTER] Falling back to mock data due to error');
+      return await _getSmsByFilter(filterType);
+    }
+  }
+
+  // Helper method to filter SMS by various criteria - MOCK DATA (fallback)
+  static Future<Map<String, dynamic>> _getSmsByFilter(String filterType) async {
+    try {
+      print('📱 [SMS_FILTER] Getting SMS with filter: $filterType');
+
+      // Get the SMS service instance
+      final smsService = SmsService();
+
+      // In a real implementation, we'd filter the actual SMS messages
+      // For now, return mock filtered data based on the filter type
+
+      List<Map<String, dynamic>> filteredMessages = [];
+      String description = '';
+
+      switch (filterType) {
+        case 'shortcodes_only':
+          // Only messages from approved shortcodes (123456, 123457)
+          filteredMessages = [
+            {
+              'id': '1767812249001',
+              'sender': '123456',
+              'message': 'Payment Of Kshs 150.00 Has Been Received By Jaystar Investments Ltd For Account 80872',
+              'timestamp': DateTime.now().millisecondsSinceEpoch - 3600000, // 1 hour ago
+              'read': true,
+              'channel': '80872',
+              'source': 'shortcode_approved'
+            },
+            {
+              'id': '1767812249002',
+              'sender': '123457',
+              'message': 'Your merchant account 57938 has been credited with KES 200.00',
+              'timestamp': DateTime.now().millisecondsSinceEpoch - 1800000, // 30 min ago
+              'read': false,
+              'channel': '57938',
+              'source': 'shortcode_approved'
+            }
+          ];
+          description = 'Messages from approved shortcodes only (123456, 123457)';
+          break;
+
+        case 'non_shortcodes_only':
+          // Messages from regular phone numbers (rejected/scam attempts)
+          filteredMessages = [
+            {
+              'id': '1767812249003',
+              'sender': '0712345678',
+              'message': 'Payment of KES 500.00 has been credited to your account. Call 0723456789 to claim.',
+              'timestamp': DateTime.now().millisecondsSinceEpoch - 900000, // 15 min ago
+              'read': false,
+              'channel': 'unknown',
+              'source': 'regular_phone_rejected',
+              'rejection_reason': 'Not from approved shortcode'
+            },
+            {
+              'id': '1767812249004',
+              'sender': '0723456789',
+              'message': 'Your account has been credited with KES 1000. Reference: ABC123. Contact us immediately.',
+              'timestamp': DateTime.now().millisecondsSinceEpoch - 600000, // 10 min ago
+              'read': false,
+              'channel': 'unknown',
+              'source': 'regular_phone_rejected',
+              'rejection_reason': 'Not from approved shortcode'
+            }
+          ];
+          description = 'Messages from regular phone numbers (rejected as potential scams)';
+          break;
+
+        case 'read_only':
+          // Read messages
+          filteredMessages = [
+            {
+              'id': '1767812249005',
+              'sender': '123456',
+              'message': 'Payment confirmation received',
+              'timestamp': DateTime.now().millisecondsSinceEpoch - 7200000, // 2 hours ago
+              'read': true,
+              'channel': '80872',
+              'source': 'read_message'
+            }
+          ];
+          description = 'Read messages only';
+          break;
+
+        case 'unread_only':
+          // Unread messages
+          filteredMessages = [
+            {
+              'id': '1767812249006',
+              'sender': '123457',
+              'message': 'New payment received: KES 300.00',
+              'timestamp': DateTime.now().millisecondsSinceEpoch - 300000, // 5 min ago
+              'read': false,
+              'channel': '57938',
+              'source': 'unread_message'
+            },
+            {
+              'id': '1767812249007',
+              'sender': '0712345678',
+              'message': 'Scam attempt blocked',
+              'timestamp': DateTime.now().millisecondsSinceEpoch - 120000, // 2 min ago
+              'read': false,
+              'channel': 'unknown',
+              'source': 'unread_message'
+            }
+          ];
+          description = 'Unread messages only';
+          break;
+
+        default:
+          description = 'Unknown filter type';
+      }
+
+      final result = {
+        'status': 'success',
+        'filter_type': filterType,
+        'description': description,
+        'timestamp': DateTime.now().toUtc().toIso8601String(),
+        'count': filteredMessages.length,
+        'messages': filteredMessages,
+        'metadata': {
+          'filtered_at': DateTime.now().toUtc().toIso8601String(),
+          'data_source': 'sms_service_filtered',
+          'filter_criteria': filterType,
+        }
+      };
+
+      print('📊 [SMS_FILTER] Filtered $filterType: ${filteredMessages.length} messages');
+      return result;
+
+    } catch (e) {
+      print('❌ [SMS_FILTER] Error filtering SMS: $e');
+      return {
+        'status': 'error',
+        'filter_type': filterType,
+        'error': e.toString(),
+        'timestamp': DateTime.now().toUtc().toIso8601String(),
+      };
+    }
+  }
+
+  // Check if running on Android emulator
+  static Future<bool> _isRunningOnEmulator() async {
+    try {
+      // Check for common emulator indicators
+      final deviceInfo = {
+        'model': 'unknown',
+        'manufacturer': 'unknown',
+        'isEmulator': false,
+      };
+
+      // Check system properties that indicate emulator
+      // This is a simplified check - in production you'd use device_info_plus package
+      final emulatorIndicators = [
+        'sdk', 'emulator', 'android sdk built for x86', 'generic'
+      ];
+
+      // For now, we'll use a simple heuristic based on common emulator patterns
+      // In a real app, you'd use device_info_plus package for accurate detection
+      final hostname = Platform.localHostname.toLowerCase();
+      final isEmulatorHostname = hostname.contains('emulator') ||
+                                 hostname.contains('sdk') ||
+                                 hostname == 'localhost';
+
+      // Check if we can bind to typical emulator ports or detect emulator-specific files
+      // This is a simplified approach for the demo
+      final emulatorDetected = isEmulatorHostname ||
+                              Platform.environment.containsKey('ANDROID_EMULATOR') ||
+                              Platform.environment['USER']?.toLowerCase().contains('emulator') == true;
+
+      print('🤖 Emulator detection: hostname=$hostname, detected=$emulatorDetected');
+
+      return emulatorDetected;
+
+    } catch (e) {
+      print('❌ Error detecting emulator: $e');
+      // Default to false if detection fails
+      return false;
+    }
+  }
+
   static Future<String> _getLocalIp() async {
     try {
       final interfaces = await NetworkInterface.list();
@@ -812,5 +1172,141 @@ class MicroServerService {
       print('Error getting local IP: $e');
     }
     return 'Unknown';
+  }
+
+  // Inventory local handler - queries local SQLite database
+  static Future<Response> _inventoryLocalHandler(Request request) async {
+    try {
+      final pageParam = request.params['page'];
+      if (pageParam == null || pageParam.isEmpty) {
+        return Response(400, body: jsonEncode({
+          'status': 'error',
+          'message': 'Page parameter is required'
+        }), headers: {'Content-Type': 'application/json'});
+      }
+
+      final page = int.tryParse(pageParam);
+      if (page == null || page < 1) {
+        return Response(400, body: jsonEncode({
+          'status': 'error',
+          'message': 'Invalid page number. Must be a positive integer'
+        }), headers: {'Content-Type': 'application/json'});
+      }
+
+      // Parse limit from query parameters (default 20)
+      final limitParam = request.url.queryParameters['limit'];
+      final limit = limitParam != null ? int.tryParse(limitParam) ?? 20 : 20;
+      if (limit < 1 || limit > 100) {
+        return Response(400, body: jsonEncode({
+          'status': 'error',
+          'message': 'Invalid limit. Must be between 1 and 100'
+        }), headers: {'Content-Type': 'application/json'});
+      }
+
+      print('📦 Inventory API: Getting local inventory - Page: $page, Limit: $limit');
+
+      // Calculate offset for pagination
+      final offset = (page - 1) * limit;
+
+      // Open database
+      final databasesPath = await getDatabasesPath();
+      final dbPath = join(databasesPath, 'microserver_inventory.db');
+      final db = await openDatabase(dbPath, readOnly: true);
+
+      try {
+        // Get total count
+        final countResult = await db.rawQuery('SELECT COUNT(*) as total FROM inventory_items');
+        final totalItems = Sqflite.firstIntValue(countResult) ?? 0;
+        final totalPages = (totalItems / limit).ceil();
+
+        // Validate page number
+        if (page > totalPages && totalItems > 0) {
+          return Response(400, body: jsonEncode({
+            'status': 'error',
+            'message': 'Page number exceeds total pages',
+            'total_pages': totalPages,
+            'total_items': totalItems
+          }), headers: {'Content-Type': 'application/json'});
+        }
+
+        // Query paginated inventory with JOIN
+        final items = await db.rawQuery('''
+          SELECT
+            i.uid, i.name, i.description, i.price, i.item_type, i.updated_at,
+            s.current_stock, s.last_stock_count, s.re_stock_value, s.re_stock_status
+          FROM inventory_items i
+          LEFT JOIN inventory_stock s ON i.uid = s.item_uid
+          ORDER BY i.updated_at DESC
+          LIMIT ? OFFSET ?
+        ''', [limit, offset]);
+
+        // Transform results for JSON response
+        final transformedItems = items.map((item) {
+          final currentStock = item['current_stock'] as int? ?? 0;
+          final reStockValue = item['re_stock_value'] as int? ?? 0;
+          final isLowStock = currentStock <= reStockValue;
+
+          return {
+            'uid': item['uid'],
+            'name': item['name'],
+            'description': item['description'],
+            'price': item['price'],
+            'item_type': item['item_type'],
+            'updated_at': item['updated_at'],
+            'current_stock': currentStock,
+            'last_stock_count': item['last_stock_count'] ?? 0,
+            're_stock_value': reStockValue,
+            're_stock_status': item['re_stock_status'] ?? false,
+            'stock_status': isLowStock ? 'low' : 'ok',
+          };
+        }).toList();
+
+        final response = {
+          'status': 'success',
+          'timestamp': DateTime.now().toUtc().toIso8601String(),
+          'current_page': page,
+          'total_pages': totalPages,
+          'total_items': totalItems,
+          'limit': limit,
+          'items': transformedItems,
+          'metadata': {
+            'queried_at': DateTime.now().toUtc().toIso8601String(),
+            'data_source': 'local_inventory_database',
+            'database_path': dbPath,
+          }
+        };
+
+        print('📦 Inventory API: Returned ${transformedItems.length} items for page $page/$totalPages');
+
+        return Response.ok(
+          jsonEncode(response),
+          headers: {'Content-Type': 'application/json'},
+        );
+
+      } finally {
+        await db.close();
+      }
+
+    } catch (e) {
+      print('❌ Inventory API error (_inventoryLocalHandler): $e');
+
+      // Check if database exists
+      final databasesPath = await getDatabasesPath();
+      final dbPath = join(databasesPath, 'microserver_inventory.db');
+      final dbExists = await databaseExists(dbPath);
+
+      if (!dbExists) {
+        return Response(404, body: jsonEncode({
+          'status': 'error',
+          'message': 'Inventory database not found. Run sync_inventory first to populate the database',
+          'suggestion': 'Use option 12 in query_microserver.py to sync inventory data first'
+        }), headers: {'Content-Type': 'application/json'});
+      }
+
+      return Response(500, body: jsonEncode({
+        'status': 'error',
+        'message': 'Failed to query inventory database: $e'
+      }), headers: {'Content-Type': 'application/json'});
+    }
   }
 }

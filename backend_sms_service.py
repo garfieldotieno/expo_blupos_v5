@@ -90,10 +90,20 @@ class SMSPaymentParser:
 class PaymentReconciliationService:
     """Handle SMS payment reconciliation with blocking checkout structure and payment queue"""
     
-    def __init__(self, db_path: str = 'pos_test.db'):
+    def __init__(self, db_path: str = None):
         self.parser = SMSPaymentParser()
         self.payment_queue = []  # In-memory queue for pending payments
-        self.db_path = db_path
+
+        # Use instance database path to match Flask SQLAlchemy configuration
+        if db_path is None:
+            import os
+            instance_path = os.path.join(os.getcwd(), 'instance', 'pos_test.db')
+            # Ensure instance directory exists
+            os.makedirs(os.path.dirname(instance_path), exist_ok=True)
+            self.db_path = instance_path
+        else:
+            self.db_path = db_path
+
         self._init_database()
     
     def _init_database(self):
@@ -520,12 +530,19 @@ def test_sms_processing():
 @app.route('/api/sms/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
-    return jsonify({6161107774059
-        'status': 'healthy',
-        'service': 'SMS Payment Verification Service',
-        'timestamp': datetime.now().isoformat(),
-        'queue_length': len(reconciliation_service.payment_queue)
-    })
+    try:
+        response_data = {
+            'status': 'healthy',
+            'service': 'SMS Payment Verification Service',
+            'timestamp': datetime.now().isoformat(),
+            'queue_length': len(reconciliation_service.payment_queue)
+        }
+        return jsonify(response_data)
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
 
 if __name__ == '__main__':
     logger.info("Starting SMS Payment Verification Service...")

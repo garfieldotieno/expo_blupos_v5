@@ -9,6 +9,18 @@ import 'sms_reconciliation_service.dart';
 class SmsService extends ChangeNotifier {
   static const platform = MethodChannel('com.blupos.wallet/sms');
 
+  // Singleton pattern
+  static SmsService? _instance;
+
+  static SmsService get instance {
+    _instance ??= SmsService._internal();
+    return _instance!;
+  }
+
+  SmsService._internal();
+
+  factory SmsService() => instance;
+
   List<Map<String, dynamic>> _smsMessages = [];
   int _unreadSmsCount = 0;
   Timer? _smsCheckTimer;
@@ -130,10 +142,21 @@ class SmsService extends ChangeNotifier {
     });
   }
 
-  // Handle incoming SMS from native SMS monitoring (any SMS for blinking animation)
+  // Handle incoming SMS from native SMS monitoring (only from approved shortcodes)
   void _handleIncomingSms(Map<String, dynamic> smsData) {
     print('\n📨 [SMS_INCOMING] === INCOMING SMS RECEIVED ===');
     print('📨 [SMS_INCOMING] From: ${smsData['sender']} | Message: "${smsData['message']}"');
+
+    // 🔒 SECURITY CHECK: Only process SMS from approved shortcodes
+    final sender = smsData['sender'] ?? '';
+    if (!_isValidShortcode(sender)) {
+      print('🚫 [SMS_INCOMING] REJECTED: Sender "$sender" is not an approved shortcode');
+      print('📋 [SMS_INCOMING] Approved shortcodes: 123456 (80872), 123457 (57938)');
+      print('✅ [SMS_INCOMING] === SMS REJECTED ===\n');
+      return; // Don't process this SMS
+    }
+
+    print('✅ [SMS_INCOMING] APPROVED: Sender "$sender" is a valid shortcode');
 
     // Log current state before adding new SMS
     final previousCount = _unreadSmsCount;
@@ -234,6 +257,12 @@ class SmsService extends ChangeNotifier {
     return 'unknown';
   }
 
+  // ✅ SECURITY: Validate if sender is an approved shortcode
+  bool _isValidShortcode(String sender) {
+    const approvedShortcodes = ['123456', '123457'];
+    return approvedShortcodes.contains(sender);
+  }
+
   // ✅ Add payment detection logic
   bool _isPaymentMessage(String message) {
     final paymentKeywords = [
@@ -275,6 +304,18 @@ class SmsService extends ChangeNotifier {
     }
   }
 
+  // Clear persisted SMS data
+  Future<void> _clearPersistedSmsData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('sms_messages');
+      await prefs.remove('unread_sms_count');
+      print('🧹 [SMS_SERVICE] Cleared all persisted SMS data');
+    } catch (e) {
+      print('❌ [SMS_SERVICE] Error clearing persisted SMS data: $e');
+    }
+  }
+
   // Initialize SMS service with persistence
   Future<void> initialize() async {
     try {
@@ -288,7 +329,20 @@ class SmsService extends ChangeNotifier {
 
       if (smsPermission.isGranted || receiveSmsPermission.isGranted || readSmsPermission.isGranted) {
         print('✅ [SMS_SERVICE] SMS permissions granted');
-        await _loadSmsMessages(); // Load from device inbox
+
+        // FIRST: Load from device inbox to get current state
+        await _loadSmsMessages();
+
+        // SECOND: Clean up persisted data if device inbox is empty
+        final deviceInboxResult = await platform.invokeMethod('loadSmsInbox');
+        if (deviceInboxResult != null && deviceInboxResult is List && deviceInboxResult.isEmpty) {
+          print('🧹 [SMS_SERVICE] Device inbox empty on startup - clearing stale persisted data');
+          await _clearPersistedSmsData();
+          _smsMessages.clear();
+          _unreadSmsCount = 0;
+          print('✅ [SMS_SERVICE] Startup cleanup complete - clean slate');
+        }
+
         await _startSmsListener();
         _setupPlatformChannel();
 
@@ -509,17 +563,17 @@ class SmsService extends ChangeNotifier {
     }
   }
 
-  // Periodic inbox refresh for fresh SMS updates
+  // Periodic inbox refresh for fresh SMS updates and read status sync
   Future<void> _refreshInboxPeriodically() async {
     try {
-      print('🔍 [SMS_INBOX_REFRESH] Checking for new SMS in device inbox...');
+      print('🔍 [SMS_INBOX_REFRESH] Checking for new SMS and syncing read status...');
 
-      // Query device SMS inbox for any new messages
+      // Query device SMS inbox for current state
       final result = await platform.invokeMethod('loadSmsInbox');
 
       if (result != null && result is List) {
         final List<dynamic> rawList = result;
-        final inboxSms = rawList.map((item) {
+        final deviceInboxSms = rawList.map((item) {
           if (item is Map) {
             return Map<String, dynamic>.from(item);
           }
@@ -527,9 +581,24 @@ class SmsService extends ChangeNotifier {
         }).toList();
 
         int newSmsCount = 0;
+        int readStatusUpdates = 0;
 
-        // Process each SMS from inbox
-        for (final smsData in inboxSms) {
+        // First, check if any of our existing SMS have been marked as read in device
+        for (final appSms in _smsMessages) {
+          // Check if this SMS still exists in device inbox (unread SMS only returned)
+          final deviceIndex = deviceInboxSms.indexWhere((deviceSms) => deviceSms['id'] == appSms['id']);
+
+          if (deviceIndex == -1 && appSms['read'] == false) {
+            // SMS is not in device unread list, but we marked it as unread
+            // This means it was marked as read in the device's SMS app
+            appSms['read'] = true;
+            readStatusUpdates++;
+            print('✅ [SMS_INBOX_REFRESH] Marked SMS as read (device sync): ${appSms['sender']} - "${appSms['body']?.toString().substring(0, 30)}..."');
+          }
+        }
+
+        // Then, process any new SMS from device inbox
+        for (final smsData in deviceInboxSms) {
           // Check if we already have this SMS (avoid duplicates)
           final existingIndex = _smsMessages.indexWhere((msg) => msg['id'] == smsData['id']);
           if (existingIndex == -1) {
@@ -549,13 +618,26 @@ class SmsService extends ChangeNotifier {
           }
         }
 
-        if (newSmsCount > 0) {
-          // Update count and emit stream event for new messages
+        // Update counts if any changes occurred
+        if (newSmsCount > 0 || readStatusUpdates > 0) {
           _updateUnreadCount();
-          print('📨 [SMS_INBOX_REFRESH] Added $newSmsCount new SMS messages to inbox');
+          print('📨 [SMS_INBOX_REFRESH] Added $newSmsCount new SMS, updated $readStatusUpdates read statuses');
         } else {
-          print('📋 [SMS_INBOX_REFRESH] No new SMS messages found');
+          print('📋 [SMS_INBOX_REFRESH] No new SMS or read status changes found');
         }
+
+        // 🧹 CLEANUP: Clear persisted data if device inbox is empty (aggressive cleanup for testing)
+        if (deviceInboxSms.isEmpty) {
+          print('🧹 [SMS_INBOX_REFRESH] Device inbox empty - clearing all persisted SMS data for clean testing slate');
+          await _clearPersistedSmsData();
+          // Also clear in-memory messages to ensure clean state
+          _smsMessages.clear();
+          _unreadSmsCount = 0;
+          _updateUnreadCount(); // This will save the cleared state
+          print('✅ [SMS_INBOX_REFRESH] Cleared all SMS data - app now has clean slate');
+        }
+
+        print('📊 [SMS_INBOX_REFRESH] Device inbox: ${deviceInboxSms.length} unread, App memory: ${_smsMessages.length} total, ${_smsMessages.where((msg) => msg['read'] == false).length} unread');
       } else {
         print('📋 [SMS_INBOX_REFRESH] No SMS data returned from device inbox');
       }

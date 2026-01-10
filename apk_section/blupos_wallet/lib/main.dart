@@ -31,6 +31,7 @@ void main() async {
   // Start micro-server
   try {
     await MicroServerService.startServer();
+
   } catch (e) {
     print('⚠️  Failed to start micro-server: $e');
   }
@@ -101,6 +102,20 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   final NetworkDiscoveryService _networkDiscovery = NetworkDiscoveryService();
   late StreamSubscription<List<DiscoveredServer>> _discoverySubscription;
 
+  // Reactive payments data
+  List<Map<String, dynamic>> _paymentsData = [];
+  bool _paymentsLoading = false;
+  Timer? _paymentsRefreshTimer;
+
+  // Reactive pending payments data
+  List<Map<String, dynamic>> _pendingPaymentsData = [];
+  bool _pendingPaymentsLoading = false;
+
+  // SMS sync functionality
+  bool _isSmsSyncing = false;
+  String _lastSyncResult = '';
+  Timer? _smsSyncTimer;
+
   @override
   void initState() {
     super.initState();
@@ -166,6 +181,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     _unreadCountSubscription.cancel();
     _discoverySubscription.cancel();
     _networkDiscovery.stopDiscovery();
+    _paymentsRefreshTimer?.cancel();
+    _smsSyncTimer?.cancel();
     super.dispose();
   }
 
@@ -339,7 +356,287 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       setState(() {
         _isLoading = false;
       });
+
+      // Start reactive payments loading after app state is loaded
+      if (_appState == AppState.active) {
+        _startReactivePayments();
+      }
     }
+  }
+
+  // Start reactive payments loading and timer
+  void _startReactivePayments() {
+    _loadPaymentsData();
+    _loadPendingPaymentsData();
+    _startPaymentsRefreshTimer();
+    _startSmsSyncTimer();
+  }
+
+  // Load payments data reactively
+  Future<void> _loadPaymentsData() async {
+    if (!mounted) return;
+
+    print('🔄 [APK] Starting refetch for CLEARED payments data...');
+    final startTime = DateTime.now();
+
+    setState(() {
+      _paymentsLoading = true;
+    });
+
+    try {
+      final payments = await _getRealPayments();
+      final endTime = DateTime.now();
+      final duration = endTime.difference(startTime);
+
+      print('✅ [APK] CLEARED payments refetch completed: ${payments.length} records in ${duration.inMilliseconds}ms');
+
+      if (mounted) {
+        setState(() {
+          _paymentsData = payments;
+          _paymentsLoading = false;
+        });
+      }
+    } catch (e) {
+      print('❌ [APK] CLEARED payments refetch failed: $e');
+      if (mounted) {
+        setState(() {
+          _paymentsLoading = false;
+        });
+      }
+    }
+  }
+
+  // Start timer for periodic payments refresh
+  void _startPaymentsRefreshTimer() {
+    _paymentsRefreshTimer?.cancel();
+    _paymentsRefreshTimer = Timer.periodic(
+      const Duration(seconds: 30), // Refresh every 30 seconds
+      (_) {
+        _loadPaymentsData();      // Refresh cleared payments
+        _loadPendingPaymentsData(); // Also refresh pending payments
+      },
+    );
+  }
+
+  // Start timer for automatic SMS sync (option 9 from query_microserver.py)
+  void _startSmsSyncTimer() {
+    _smsSyncTimer?.cancel();
+    _smsSyncTimer = Timer.periodic(
+      const Duration(seconds: 5), // Sync SMS every 5 seconds (option 9)
+      (_) => _performSmsSync(),
+    );
+  }
+
+  // Perform SMS sync (equivalent to option 9: export_valid_payments from query_microserver.py)
+  Future<void> _performSmsSync() async {
+    if (!mounted || _isSmsSyncing) return;
+
+    print('🔄 Exporting valid payments from shortcodes to backend...');
+    final startTime = DateTime.now();
+
+    setState(() {
+      _isSmsSyncing = true;
+    });
+
+    try {
+      // Step 1: Query SMS from approved shortcodes from MICROSERVER (port 8085, like query_microserver.py)
+      final microserverUrl = await _getMicroserverUrl('/sms/shortcodes');
+      print('🔍 Querying: GET $microserverUrl');
+
+      final shortcodesResponse = await http.get(Uri.parse(microserverUrl)).timeout(const Duration(seconds: 30));
+
+      if (shortcodesResponse.statusCode != 200) {
+        print('❌ Failed to get shortcode SMS: ${shortcodesResponse.statusCode}');
+        setState(() {
+          _lastSyncResult = 'Failed to get SMS data (${DateTime.now().difference(startTime).inMilliseconds}ms)';
+        });
+        return;
+      }
+
+      final smsData = jsonDecode(shortcodesResponse.body);
+      final messages = smsData['messages'] as List<dynamic>? ?? [];
+
+      if (messages.isEmpty) {
+        print('ℹ️ No shortcode SMS messages found');
+        setState(() {
+          _lastSyncResult = 'No SMS to export (${DateTime.now().difference(startTime).inMilliseconds}ms)';
+        });
+        return;
+      }
+
+      print('📱 Found ${messages.length} shortcode messages');
+
+      // Step 2: Process each message (exact logic from query_microserver.py)
+      int exportedCount = 0;
+      for (final msg in messages) {
+        try {
+          // Extract payment info from message - adjust field names based on actual microserver response
+          final messageText = msg['body'] as String? ?? msg['message'] as String? ?? '';
+
+          String channel = '';
+          String reference = '';
+
+          // Extract channel from message content (Account number in the message)
+          if (messageText.toLowerCase().contains('account')) {
+            final accountMatch = RegExp(r'(?:merchant\s+)?[Aa]ccount\s+(\d+)').firstMatch(messageText);
+            if (accountMatch != null) {
+              channel = accountMatch.group(1)!;
+            }
+          }
+
+          // Extract reference (multiple formats)
+          // Format 1: "ref #ABC123" (57938 merchant account format)
+          var refMatch = RegExp(r'ref\s*#\s*([A-Z0-9]+)', caseSensitive: false).firstMatch(messageText);
+          if (refMatch != null) {
+            reference = refMatch.group(1)!;
+            print('   🔗 Reference extracted via \'ref #\' format: \'$reference\'');
+          } else {
+            // Format 2: "ABC123~" (reference before tilde, 80872 account format)
+            final tildeMatch = RegExp(r'([A-Z0-9]+)~').firstMatch(messageText);
+            if (tildeMatch != null) {
+              reference = tildeMatch.group(1)!;
+              print('   🔗 Reference extracted via \'~\' format: \'$reference\'');
+            } else {
+              print('   ⚠️ No reference found in message');
+            }
+          }
+
+          // Debug: Print message data to see what's available
+          print('🔍 Processing message ID ${msg['id']}:');
+          print('   📄 Full message data: $msg');
+          print('   🔍 Extracted channel: \'$channel\' (length: ${channel.length})');
+          print('   🔗 Extracted reference: \'$reference\' (length: ${reference.length})');
+          print('   📝 Extracted message: \'${messageText.substring(0, messageText.length > 50 ? 50 : messageText.length)}...\' (length: ${messageText.length})');
+
+          // Validate required fields
+          if (channel.isEmpty || messageText.isEmpty) {
+            print('⚠️ Skipping message ${msg['id']}: missing channel or message');
+            continue;
+          }
+
+          // Send to backend SMS processing endpoint (microserver version bypasses auth)
+          final paymentData = {
+            'channel': channel,
+            'message': messageText,
+            'reference': reference.isNotEmpty ? reference : null
+          };
+
+          final backendUrl = await _getBackendUrl('/api/sms/process_microserver');
+          final backendResponse = await http.post(
+            Uri.parse(backendUrl),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(paymentData),
+          ).timeout(const Duration(seconds: 10));
+
+          if (backendResponse.statusCode == 200) {
+            exportedCount++;
+            print('✅ Exported payment from channel $channel');
+          } else {
+            print('⚠️ Failed to export payment from channel $channel: ${backendResponse.statusCode}');
+            // Print backend error response for debugging
+            try {
+              final errorData = jsonDecode(backendResponse.body);
+              print('   Backend error: ${errorData['message'] ?? 'Unknown error'}');
+            } catch (e) {
+              print('   Backend response: ${backendResponse.body.substring(0, backendResponse.body.length > 200 ? 200 : backendResponse.body.length)}...');
+            }
+          }
+
+        } catch (e) {
+          print('❌ Error processing message ${msg['id']}: $e');
+        }
+      }
+
+      final endTime = DateTime.now();
+      final duration = endTime.difference(startTime);
+
+      print('📊 Successfully exported $exportedCount/${messages.length} payments to backend');
+
+      setState(() {
+        _lastSyncResult = 'Success: $exportedCount/${messages.length} payments exported (${duration.inMilliseconds}ms)';
+      });
+
+      // Refresh payment data after successful sync
+      await _loadPaymentsData();
+      await _loadPendingPaymentsData();
+
+    } catch (e) {
+      final endTime = DateTime.now();
+      final duration = endTime.difference(startTime);
+
+      print('❌ Error in export_valid_payments: $e');
+      setState(() {
+        _lastSyncResult = 'Error: $e (${duration.inMilliseconds}ms)';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSmsSyncing = false;
+        });
+      }
+    }
+  }
+
+  // Extract exported count from microserver response
+  int _extractExportedCount(String responseBody) {
+    try {
+      // Look for patterns like "Successfully exported X/Y payments"
+      final exportedMatch = RegExp(r'Successfully exported (\d+)/(\d+) payments').firstMatch(responseBody);
+      if (exportedMatch != null) {
+        return int.tryParse(exportedMatch.group(1) ?? '0') ?? 0;
+      }
+
+      // Fallback: look for any number followed by "payments exported"
+      final fallbackMatch = RegExp(r'(\d+)\s+payments?\s+exported').firstMatch(responseBody);
+      if (fallbackMatch != null) {
+        return int.tryParse(fallbackMatch.group(1) ?? '0') ?? 0;
+      }
+
+      return 0;
+    } catch (e) {
+      print('⚠️ [APK] Error extracting export count: $e');
+      return 0;
+    }
+  }
+
+  // Load pending payments data reactively
+  Future<void> _loadPendingPaymentsData() async {
+    if (!mounted) return;
+
+    print('🔄 [APK] Starting refetch for PENDING payments data...');
+    final startTime = DateTime.now();
+
+    setState(() {
+      _pendingPaymentsLoading = true;
+    });
+
+    try {
+      final pendingPayments = await _getPendingPayments();
+      final endTime = DateTime.now();
+      final duration = endTime.difference(startTime);
+
+      print('✅ [APK] PENDING payments refetch completed: ${pendingPayments.length} records in ${duration.inMilliseconds}ms');
+
+      if (mounted) {
+        setState(() {
+          _pendingPaymentsData = pendingPayments;
+          _pendingPaymentsLoading = false;
+        });
+      }
+    } catch (e) {
+      print('❌ [APK] PENDING payments refetch failed: $e');
+      if (mounted) {
+        setState(() {
+          _pendingPaymentsLoading = false;
+        });
+      }
+    }
+  }
+
+  // Manual refresh for pull-to-refresh
+  Future<void> _refreshPayments() async {
+    await _loadPaymentsData();
+    await _loadPendingPaymentsData();
   }
 
   Future<void> _syncRealDataFromBluPOS() async {
@@ -440,33 +737,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         print('❌ Balance API failed with status: ${balanceResponse.statusCode}');
       }
 
-      // Fetch real payments from BluPOS using configured backend URL
-      final paymentsResponse = await http.get(Uri.parse(paymentsUrl));
-      print('💳 Payments response status: ${paymentsResponse.statusCode}');
-      print('💳 Payments response body: ${paymentsResponse.body}');
-
-      if (paymentsResponse.statusCode == 200) {
-        final paymentsData = jsonDecode(paymentsResponse.body);
-        print('💳 Parsed payments data: $paymentsData');
-
-        if (paymentsData['status'] == 'success' && paymentsData['payments'] != null) {
-          final prefs = await SharedPreferences.getInstance();
-          final paymentsList = paymentsData['payments'] as List<dynamic>;
-          await prefs.setString('real_payments', jsonEncode(paymentsList));
-          print('💳 Stored ${paymentsList.length} real payments');
-
-          // Update UI immediately if we're on the main screen
-          if (mounted && !_isLoading) {
-            setState(() {
-              // Force rebuild of payments display
-            });
-          }
-        } else {
-          print('❌ Payments API returned error: ${paymentsData['message']}');
-        }
-      } else {
-        print('❌ Payments API failed with status: ${paymentsResponse.statusCode}');
-      }
+      // Note: Payments are now fetched real-time, no persistence
 
       print('✅ Real data fetch completed');
     } catch (e) {
@@ -501,35 +772,86 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   Future<List<Map<String, dynamic>>> _getRealPayments() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final realPaymentsJson = prefs.getString('real_payments');
-      if (realPaymentsJson != null && realPaymentsJson.isNotEmpty) {
-        final payments = jsonDecode(realPaymentsJson) as List<dynamic>;
-        final paymentsList = payments.cast<Map<String, dynamic>>();
+      // Fetch real-time payments directly from the backend
+      final paymentsUrl = await _getBackendUrl('/get_latest_payments');
+      final paymentsResponse = await http.get(Uri.parse(paymentsUrl));
 
-        // Sort chronologically from latest (top) to oldest (bottom)
-        paymentsList.sort((a, b) {
-          final dateA = a['datetime'];
-          final dateB = b['datetime'];
+      if (paymentsResponse.statusCode == 200) {
+        final paymentsData = jsonDecode(paymentsResponse.body);
 
-          if (dateA == null && dateB == null) return 0;
-          if (dateA == null) return 1; // null dates go to bottom
-          if (dateB == null) return -1;
+        if (paymentsData['status'] == 'success' && paymentsData['payments'] != null) {
+          final payments = paymentsData['payments'] as List<dynamic>;
+          final paymentsList = payments.cast<Map<String, dynamic>>();
 
-          try {
-            final parsedA = DateTime.parse(dateA);
-            final parsedB = DateTime.parse(dateB);
-            return parsedB.compareTo(parsedA); // Latest first
-          } catch (e) {
-            print('⚠️ Error parsing payment dates: $e');
-            return 0;
-          }
-        });
+          // Sort chronologically from latest (top) to oldest (bottom)
+          paymentsList.sort((a, b) {
+            final dateA = a['datetime'];
+            final dateB = b['datetime'];
 
-        return paymentsList;
+            if (dateA == null && dateB == null) return 0;
+            if (dateA == null) return 1; // null dates go to bottom
+            if (dateB == null) return -1;
+
+            try {
+              final parsedA = DateTime.parse(dateA);
+              final parsedB = DateTime.parse(dateB);
+              return parsedB.compareTo(parsedA); // Latest first
+            } catch (e) {
+              print('⚠️ Error parsing payment dates: $e');
+              return 0;
+            }
+          });
+
+          return paymentsList;
+        }
+      } else {
+        print('❌ Payments API failed with status: ${paymentsResponse.statusCode}');
       }
     } catch (e) {
-      print('❌ Error getting real payments: $e');
+      print('❌ Error fetching real-time payments: $e');
+    }
+    return [];
+  }
+
+  Future<List<Map<String, dynamic>>> _getPendingPayments() async {
+    try {
+      // Fetch pending payments directly from the backend
+      final pendingUrl = await _getBackendUrl('/api/sms/pending_payments');
+      final pendingResponse = await http.get(Uri.parse(pendingUrl));
+
+      if (pendingResponse.statusCode == 200) {
+        final pendingData = jsonDecode(pendingResponse.body);
+
+        if (pendingData['status'] == 'success' && pendingData['payments'] != null) {
+          final payments = pendingData['payments'] as List<dynamic>;
+          final pendingPaymentsList = payments.cast<Map<String, dynamic>>();
+
+          // Sort by creation date, most recent first
+          pendingPaymentsList.sort((a, b) {
+            final dateA = a['created_at'] ?? a['date'];
+            final dateB = b['created_at'] ?? b['date'];
+
+            if (dateA == null && dateB == null) return 0;
+            if (dateA == null) return 1;
+            if (dateB == null) return -1;
+
+            try {
+              final parsedA = DateTime.tryParse(dateA) ?? DateTime.now();
+              final parsedB = DateTime.tryParse(dateB) ?? DateTime.now();
+              return parsedB.compareTo(parsedA); // Most recent first
+            } catch (e) {
+              print('⚠️ Error parsing pending payment dates: $e');
+              return 0;
+            }
+          });
+
+          return pendingPaymentsList;
+        }
+      } else {
+        print('❌ Pending payments API failed with status: ${pendingResponse.statusCode}');
+      }
+    } catch (e) {
+      print('❌ Error fetching pending payments: $e');
     }
     return [];
   }
@@ -632,6 +954,41 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     return fullUrl;
   }
 
+  Future<String> _getMicroserverUrl(String endpoint) async {
+    // For microserver, always use localhost (127.0.0.1) or emulator IP (10.0.2.2)
+    // NOT the discovered backend IP (192.168.0.102)
+    const possibleUrls = [
+      'http://localhost:8085',     // Localhost
+      'http://127.0.0.1:8085',     // Explicit localhost
+      'http://10.0.2.2:8085',      // Android emulator
+    ];
+
+    print('🔗 [MICROSERVER] Testing microserver connectivity...');
+
+    // Test each URL to find the working one
+    for (final baseUrl in possibleUrls) {
+      try {
+        final testUrl = '$baseUrl/health';
+        final response = await http.get(Uri.parse(testUrl)).timeout(const Duration(seconds: 2));
+
+        if (response.statusCode == 200) {
+          print('🔗 [MICROSERVER] Found working microserver at: $baseUrl');
+          final fullUrl = '$baseUrl$endpoint';
+          print('🔗 [MICROSERVER] Final constructed URL: $fullUrl');
+          return fullUrl;
+        }
+      } catch (e) {
+        print('🔗 [MICROSERVER] $baseUrl not accessible: $e');
+      }
+    }
+
+    // Fallback to localhost if none work (microserver might not be running)
+    final fallbackUrl = 'http://localhost:8085$endpoint';
+    print('🔗 [MICROSERVER] Using fallback URL: $fallbackUrl');
+    print('⚠️ [MICROSERVER] Warning: No microserver found, connection may fail');
+    return fallbackUrl;
+  }
+
   void _viewSalesReport() async {
     final pdfUrl = await _getBackendUrl('/get_sale_record_printout');
     if (mounted) {
@@ -683,7 +1040,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               elevation: _isSyncing ? 8 : 2,
             ),
             child: const Text(
-              'Reports',
+              'Menu',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -692,141 +1049,335 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           ),
         ),
 
-        // Recent Payments Section - Real data from BluPOS
-        FutureBuilder<List<Map<String, dynamic>>>(
-          future: _getRealPayments(),
-          builder: (context, snapshot) {
-            final payments = snapshot.data ?? [];
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Section Header
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(
-                    'Recent Payments',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
+        // Combined Payments Section - Maintain ratio: 3:1, 2:2, 1:3, or 0:3 (pending:cleared)
+        Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Section Header
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Payments Overview',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
                     ),
-                  ),
+                    if (_pendingPaymentsLoading || _paymentsLoading)
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                  ],
                 ),
-                
-                // Payments List
-                payments.isEmpty
-                    ? Container(
+              ),
+
+              // Calculate display ratios based on available data
+              Builder(
+                builder: (context) {
+                  final pendingCount = _pendingPaymentsData.length;
+                  final clearedCount = _paymentsData.length;
+
+                  // SANITY CHECK: Ensure no overlap between pending and cleared payments
+                  final pendingIds = _pendingPaymentsData.map((p) => p['id']?.toString()).toSet();
+                  final clearedIds = _paymentsData.map((p) => p['transaction_id']?.toString()).toSet();
+
+                  // Remove any cleared payments that appear in pending (shouldn't happen but safety check)
+                  final overlappingIds = pendingIds.intersection(clearedIds);
+                  if (overlappingIds.isNotEmpty) {
+                    print('⚠️ SANITY CHECK: Found ${overlappingIds.length} overlapping payment IDs between pending and cleared lists');
+                    print('   Overlapping IDs: $overlappingIds');
+
+                    // Filter out overlapping payments from cleared list
+                    _paymentsData.removeWhere((payment) =>
+                      overlappingIds.contains(payment['transaction_id']?.toString())
+                    );
+
+                    print('✅ SANITY CHECK: Removed overlapping payments from cleared list');
+                  }
+
+                  // Calculate how many to show based on ratios: 3:1, 2:2, 1:3, or 0:3
+                  int showPending = 0;
+                  int showCleared = 0;
+
+                  if (pendingCount == 0) {
+                    // 0:3 ratio - show up to 3 cleared payments
+                    showPending = 0;
+                    showCleared = _paymentsData.length > 3 ? 3 : _paymentsData.length;
+                  } else if (pendingCount >= 3) {
+                    // 3:1 ratio - show 3 pending, 1 cleared
+                    showPending = 3;
+                    showCleared = _paymentsData.isNotEmpty ? 1 : 0;
+                  } else if (pendingCount == 2) {
+                    // 2:2 ratio - show 2 pending, 2 cleared
+                    showPending = 2;
+                    showCleared = _paymentsData.length > 1 ? 2 : _paymentsData.length;
+                  } else if (pendingCount == 1) {
+                    // 1:3 ratio - show 1 pending, 3 cleared
+                    showPending = 1;
+                    showCleared = _paymentsData.length > 2 ? 3 : _paymentsData.length;
+                  }
+
+                  final totalToShow = showPending + showCleared;
+
+                  if (totalToShow == 0 && !_pendingPaymentsLoading && !_paymentsLoading) {
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: const Center(
+                        child: Text(
+                          'No payments available',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.black54,
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+
+                  if (_pendingPaymentsLoading || _paymentsLoading) {
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 32),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: const Center(
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+                  }
+
+                  // Build combined payments list with proper ratio
+                  final paymentsToShow = <Widget>[];
+
+                  // Add pending payments first (higher priority)
+                  if (showPending > 0) {
+                    paymentsToShow.addAll(_pendingPaymentsData.take(showPending).map((payment) {
+                      final amount = payment['amount'] ?? '0.00';
+                      final sender = payment['sender'] ?? 'Unknown';
+                      final reference = payment['reference'] ?? 'N/A';
+                      final paymentId = payment['id'] ?? 'N/A';
+                      final datetimeDisplay = payment['datetime_bottom_right'] ?? payment['display_datetime'] ?? 'Unknown time';
+
+                      return Container(
                         width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade50, // Light orange background for pending
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.orange.shade200),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.05),
+                              blurRadius: 2,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Top row: Transaction ID and Amount
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'ID: $paymentId',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.black.withValues(alpha: 0.6),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                Text(
+                                  'KES ${_formatCurrencyWithCommas(double.tryParse(amount.toString()) ?? 0.0)}',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            // Bottom row: Sender, Reference, Time
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    '$sender • REF: $reference',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.black.withValues(alpha: 0.7),
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                Text(
+                                  datetimeDisplay,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.black.withValues(alpha: 0.6),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            // Pending indicator
+                            Container(
+                              margin: const EdgeInsets.only(top: 6),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.shade100,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '⏳ PENDING',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.orange.shade800,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList());
+                  }
+
+                  // Add cleared payments (lower priority)
+                  if (showCleared > 0) {
+                    paymentsToShow.addAll(_paymentsData.take(showCleared).map((payment) {
+                      final amount = payment['amount'] ?? '0.00';
+                      final datetime = payment['datetime'] ?? '';
+                      final salesPerson = payment['sales_person'] ?? 'Unknown';
+                      final paymentType = payment['payment_type'] ?? 'Cash';
+                      final transactionId = payment['transaction_id'] ?? 'N/A';
+
+                      final adjustedDateTime = datetime.isNotEmpty
+                          ? DateTime.tryParse(datetime)?.add(const Duration(hours: 2))?.toLocal()
+                          : null;
+
+                      final timeDisplay = adjustedDateTime != null
+                          ? adjustedDateTime.toString().split(' ')[1].substring(0, 5)
+                          : '--:--';
+
+                      final dateDisplay = adjustedDateTime != null
+                          ? adjustedDateTime.toString().split(' ')[0]
+                          : '';
+
+                      return Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 8),
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(color: Colors.grey.shade200),
-                        ),
-                        child: const Center(
-                          child: Text(
-                            'No recent payments',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.black54,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.05),
+                              blurRadius: 2,
+                              offset: const Offset(0, 1),
                             ),
-                          ),
+                          ],
                         ),
-                      )
-                    : Column(
-                        children: payments.take(4).map((payment) {
-                          final amount = payment['amount'] ?? '0.00';
-                          final datetime = payment['datetime'] ?? '';
-                          final salesPerson = payment['sales_person'] ?? 'Unknown';
-                          final paymentType = payment['payment_type'] ?? 'Cash';
-                          final transactionId = payment['transaction_id'] ?? 'N/A';
-
-                          // Parse datetime and format display (add 2 hours for backend time sync)
-                          final adjustedDateTime = datetime.isNotEmpty
-                              ? DateTime.tryParse(datetime)?.add(const Duration(hours: 2))?.toLocal()
-                              : null;
-
-                          final timeDisplay = adjustedDateTime != null
-                              ? adjustedDateTime.toString().split(' ')[1].substring(0, 5)
-                              : '--:--';
-
-                          final dateDisplay = adjustedDateTime != null
-                              ? adjustedDateTime.toString().split(' ')[0]
-                              : '';
-
-                          return Container(
-                            width: double.infinity,
-                            margin: const EdgeInsets.only(bottom: 8),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.grey.shade200),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.05),
-                                  blurRadius: 2,
-                                  offset: const Offset(0, 1),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Top row: Transaction ID and Amount
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                // Top row: Transaction ID and Amount
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      'ID: $transactionId',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.black.withValues(alpha: 0.6),
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    Text(
-                                      'KES ${_formatCurrencyWithCommas(double.tryParse(amount) ?? 0.0)}',
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.black,
-                                      ),
-                                    ),
-                                  ],
+                                Text(
+                                  'ID: $transactionId',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.black.withValues(alpha: 0.6),
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
-                                const SizedBox(height: 6),
-                                // Bottom row: Clerk, Payment Type, Time
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        '$salesPerson • $paymentType',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.black.withValues(alpha: 0.7),
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    Text(
-                                      '$dateDisplay $timeDisplay',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.black.withValues(alpha: 0.6),
-                                      ),
-                                    ),
-                                  ],
+                                Text(
+                                  'KES ${_formatCurrencyWithCommas(double.tryParse(amount) ?? 0.0)}',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.black,
+                                  ),
                                 ),
                               ],
                             ),
-                          );
-                        }).toList(),
-                      ),
-              ],
-            );
-          },
+                            const SizedBox(height: 6),
+                            // Bottom row: Clerk, Payment Type, Time
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    '$salesPerson • $paymentType',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.black.withValues(alpha: 0.7),
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                Text(
+                                  '$dateDisplay $timeDisplay',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.black.withValues(alpha: 0.6),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            // Cleared indicator
+                            Container(
+                              margin: const EdgeInsets.only(top: 6),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade100,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '✅ CLEARED',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.green.shade800,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList());
+                  }
+
+                  return Column(children: paymentsToShow);
+                },
+              ),
+            ],
+          ),
         ),
 
         const SizedBox(height: 16), // Bottom spacing

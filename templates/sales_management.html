@@ -118,7 +118,7 @@
     <div class="middle_container" id="checkout_container" style="display: none;">
         <div class="after-container4" id="back_button_container">
             <p class="spacer" style="height: 2px;">
-                
+
             </p>
             <div class="product_type" onclick="switch_back_from_checkout()" id="backout_btn">
                 <span class="upper_type_label">
@@ -126,13 +126,27 @@
                 </span>
             </div>
             <p class="spacer" style="height: 8px;">
-                
+
+            </p>
+        </div>
+        <div class="after-container4" id="post_checkout_print_button" style="display: none;">
+            <p class="spacer" style="height: 2px;">
+
+            </p>
+            <div class="product_type" onclick="show_print_interface()">
+                <span class="upper_type_label">
+                    <h4 class="text-center" style="font-weight: bolder;">Print Receipt</h4>
+                </span>
+            </div>
+            <p class="spacer" style="height: 8px;">
+
             </p>
         </div>
 
         <div class="row">
             <div class="col-6">
-                <div class="info_pad" id="print_template">
+                <!-- Hidden HTML template for JavaScript compatibility -->
+                <div class="info_pad" id="print_template" style="display: none;">
                     <br>
                     <img src="static/assets/{{shop_data[0]['shop_banner_one']}}" alt="" style="width: 50px; height: 50px; position: relative; left: 42%;">
                     <p class="text-center">{{shop_data[0]['pos_shop_name']}}</p>
@@ -140,8 +154,7 @@
                     <p class="text-center">{{shop_data[0]['pos_shop_email']}}</p>
                     <p class="text-center">{{shop_data[0]['shop_adress']}}</p>
                     <p class="text-center">Served by: {{user_name['user_name']}}</p>
-                    
-                    <!-- <p class="text-center"><b>Served by: Saleguy</b></p> -->
+
                     <span>--------------------------------------</span>
                     <div id="sale_listing">
                         <table style="width:100%">
@@ -152,125 +165,197 @@
                                     <th>Price</th>
                                 </tr>
                             </thead>
-                            <tbody id="checkout_items_table_body">
-                                
-                             
-                                
-                            </tbody>
+                            <tbody id="checkout_items_table_body"></tbody>
                         </table>
                         <br>
                         <span>--------------------------------------</span>
-                        <!-- totals and vat section -->
                         <table style="width: 100%;">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th></th>
-                                    <th></th>
-                                </tr>
-                            </thead>
                             <tbody>
-                                <tr id="sub_total_row">
-
-                                </tr>
-                                <tr id="vat_total_row">
-                                    
-                                </tr>
-                                <tr id="total_row">
-                                
-                                </tr>
-                                <tr></tr>
-                                <tr></tr>
-                                <tr id="cash_row">
-                                    
-                                </tr>
-                                <tr id="change_row">
-                                    
-                                </tr>
+                                <tr id="total_row"></tr>
+                                <tr id="sub_total_row"></tr>
+                                <tr id="vat_total_row"></tr>
+                                <tr id="cash_row"></tr>
+                                <tr id="change_row"></tr>
                             </tbody>
                         </table>
                         <br>
-                        
                         <span>--------------------------------------</span>
-                        <!-- codes section -->
-                        
-
                         <h6 class="text-center" id="tranx_code"></h6>
-
                         <img src="" alt="" id="barcode_area">
-                        <br>
-                        <br>
+                        <br><br>
                         <div id="qrcode_area"></div>
-                        <style>
-                            /* CSS to center the QR code area */
-                            #qrcode_area {
-                                display: flex;
-                                justify-content: center; /* Center horizontally */
-                                align-items: center; /* Center vertically */
-                            }
-                        </style>
-
-                        <br>
-                        <br>
+                        <br><br>
                         <span>--------------------------------------</span>
-                        <br>
-                        <br>
-                        <h6 class="" style="position: relative;" id="serve_time"></h6>
-                        <h6 class="" style="position: relative;" id="bye_bye">Thanks for shopping with us!</h6>
-                        
+                        <br><br>
+                        <h6 id="serve_time"></h6>
+                        <h6 id="bye_bye">Thanks for shopping with us!</h6>
                     </div>
-                    
+                </div>
+
+                <!-- PDF Viewer for 58mm thermal receipt -->
+                <div class="info_pad" id="pdf_viewer_container" style="display: block; padding: 10px;">
+                    <h5 class="text-center" style="margin-bottom: 10px;">Receipt Preview (58mm Thermal)</h5>
+                    <div style="width: 100%; height: 621px; border: 1px solid #ddd; background: #f9f9f9;">
+                        <iframe id="receipt_pdf_viewer"
+                                style="width: 100%; height: 621px; border: none;"
+                                title="Receipt Preview">
+                        </iframe>
+                    </div>
+                    <p class="text-center" style="font-size: 12px; color: #666; margin-top: 5px;">
+                        58mm thermal paper layout - No payment information shown
+                    </p>
                 </div>
             </div>
-            <div class="col-4">
-                <div class="info_pad" id="checkout_sale">
-                            <!-- ... Rest of your HTML code ... -->
+            <div class="col-6">
+                <div class="info_pad" id="checkout_sale" style="background-color: #FEC620; border-radius: 8px; padding: 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                    <input type="hidden" name="recording_user" id="recording_user" value="{{user_name['user_name']}}">
 
-                <div class="container">
-                <h3 class="text-center"><b>Choose Payment</b></h3>
-                <br>
-                <br>
-                <label for="payment_method">Payment Method</label>
-                <select id="payment_method" onchange="togglePaymentFields()">
-                    <option value="cash">Cash</option>
-                    <option value="mpesa">Mpesa</option>
-                </select>
-                <input type="hidden" name="recording_user" id="recording_user" value="{{user_name['user_name']}}">
-                <br>
-                <div id="cash_fields" style="display: none;">
-                    <!-- Your cash-related fields here -->
-                    <!-- For example, input field for cash payment -->
-                    <label for="checkout_payment_input">Cash Payment</label>
-                    <input type="text" id="checkout_payment_input" autofocus>
-                    <br>
-                </div>
-                <div id="mpesa_fields" style="display: none;">
-                    <!-- Your MPESA-related fields here -->
-                    <label for="mpesa_gateway">MPESA Gateway</label>
-                    <select id="mpesa_gateway">
-                        <option value="223111-476921">223111-476921</option>
-                        <option value="400200-6354">400200-6354</option>
-                        <option value="765244-80872">765244-80872</option>
-                    </select>
-                    <br>
-                    <!-- Display payment input for MPESA as well -->
-                    <label for="mpesa_payment_input">MPESA Payment</label>
-                    <input type="text" id="mpesa_payment_input">
-                    <br>
-                    <!-- Display payment input for MPESA as well -->
-                    <label for="mpesa_reference_input">MPESA Ref</label>
-                    <input type="text" id="mpesa_reference_input">
-                    <br>
-                </div>
-                <p class="text-center" id="input_error" style="display: none;">Invalid input !</p>
-                <br>
-                <h6 class="text-center" id="sale_payment"></h6>
-                <h6 class="text-center" id="sale_total_display2"></h6>
-                <h6 class="text-center" id="sale_change_display"><b>Change: 0.00</b></h6>
-                </div>
+                    <!-- Payment Method Selection Header -->
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <h3 style="color: #333; font-weight: 600; margin: 0;"><b>💳 Choose Payment Method</b></h3>
+                        <p style="color: #666; font-size: 14px; margin: 5px 0 0 0;">Select your preferred payment option</p>
+                    </div>
 
-<!-- ... Rest of your HTML code ... -->
+                    <!-- Payment Method Buttons -->
+                    <div style="display: flex; gap: 10px; margin-bottom: 25px; flex-wrap: wrap;">
+                        <button type="button" id="cash_btn" class="payment-method-btn active"
+                                onclick="selectPaymentMethod('cash')" style="flex: 1; min-width: 120px;">
+                            <span style="font-size: 18px;">💵</span><br>
+                            <span style="font-weight: 600;">Cash</span>
+                        </button>
+                        <button type="button" id="mpesa_btn" class="payment-method-btn"
+                                onclick="selectPaymentMethod('mpesa')" style="flex: 1; min-width: 120px;">
+                            <span style="font-size: 18px;">📱</span><br>
+                            <span style="font-weight: 600;">M-Pesa</span>
+                        </button>
+                        <button type="button" id="mpesa_online_btn" class="payment-method-btn"
+                                onclick="selectPaymentMethod('mpesa_online')" style="flex: 1; min-width: 120px;">
+                            <span style="font-size: 18px;">🔄</span><br>
+                            <span style="font-weight: 600;">M-Pesa Online</span>
+                        </button>
+                    </div>
 
+                    <!-- Cash Payment Fields -->
+                    <div id="cash_fields" class="payment-fields" style="display: block;">
+                        <div style="background: white; padding: 15px; border-radius: 6px; border: 2px solid #e0e0e0;">
+                            <h5 style="color: #333; margin: 0 0 15px 0; text-align: center;">
+                                💵 <strong>Cash Payment</strong>
+                            </h5>
+                            <div style="margin-bottom: 15px;">
+                                <label for="checkout_payment_input" style="display: block; font-weight: 600; color: #555; margin-bottom: 5px;">Enter Cash Amount</label>
+                                <input type="number" id="checkout_payment_input" step="0.01" min="0"
+                                       style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 4px; font-size: 16px; font-weight: 600; text-align: center;"
+                                       placeholder="KES 0.00" autofocus>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- M-Pesa Payment Fields -->
+                    <div id="mpesa_fields" class="payment-fields" style="display: none;">
+                        <div style="background: white; padding: 15px; border-radius: 6px; border: 2px solid #ddd;">
+                            <h5 style="color: #333; margin: 0 0 15px 0; text-align: center;">
+                                📱 <strong>M-Pesa Payment</strong>
+                            </h5>
+                            <div style="margin-bottom: 15px;">
+                                <label for="mpesa_gateway" style="display: block; font-weight: 600; color: #555; margin-bottom: 5px;">Select Gateway</label>
+                                <select id="mpesa_gateway" style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 4px; font-size: 14px; background: white;">
+                                    <option value="223111-476921">🏪 Gateway 1 (223111-476921)</option>
+                                    <option value="400200-6354">🏪 Gateway 2 (400200-6354)</option>
+                                    <option value="765244-80872">🏪 Gateway 3 (765244-80872)</option>
+                                </select>
+                            </div>
+                            <div style="margin-bottom: 15px;">
+                                <label for="mpesa_payment_input" style="display: block; font-weight: 600; color: #555; margin-bottom: 5px;">Payment Amount</label>
+                                <input type="number" id="mpesa_payment_input" step="0.01" min="0"
+                                       style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 4px; font-size: 16px; font-weight: 600; text-align: center;"
+                                       placeholder="KES 0.00">
+                            </div>
+                            <div style="margin-bottom: 15px;">
+                                <label for="mpesa_reference_input" style="display: block; font-weight: 600; color: #555; margin-bottom: 5px;">Transaction Reference</label>
+                                <input type="text" id="mpesa_reference_input"
+                                       style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 4px; font-size: 14px; text-transform: uppercase;"
+                                       placeholder="Enter M-Pesa reference" maxlength="20">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- M-Pesa Online Payment Fields -->
+                    <div id="mpesa_online_fields" class="payment-fields" style="display: none;">
+                        <div style="background: white; padding: 15px; border-radius: 6px; border: 2px solid #ddd;">
+                            <h5 style="color: #333; margin: 0 0 15px 0; text-align: center;">
+                                🔄 <strong>M-Pesa Online Reconciliation</strong>
+                            </h5>
+
+                            <!-- Pending Payments Selector -->
+                            <div style="margin-bottom: 20px;">
+                                <label for="pending_payments_select" style="display: block; font-weight: 600; color: #555; margin-bottom: 8px;">
+                                    📋 Select Received Payment
+                                </label>
+                                <select id="pending_payments_select" onchange="onPaymentSelectionChange()"
+                                        style="width: 100%; padding: 12px; border: 2px solid #007bff; border-radius: 4px; font-size: 14px; background: white;">
+                                    <option value="">🔄 Loading pending payments...</option>
+                                </select>
+                            </div>
+
+                            <!-- Enhanced Selected Payment Info -->
+                            <div id="selected_payment_info" class="selected-payment-card"
+                                 style="display: none; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                                <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                                    <span style="font-size: 20px; margin-right: 10px;">✅</span>
+                                    <strong style="font-size: 16px;">Selected Payment Details</strong>
+                                </div>
+                                <div style="background: rgba(255,255,255,0.1); padding: 12px; border-radius: 6px; backdrop-filter: blur(10px);">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                        <span style="font-weight: 600;">Amount:</span>
+                                        <span id="selected_payment_amount" style="font-size: 18px; font-weight: 700;">KES 0.00</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                        <span style="font-weight: 600;">Sender:</span>
+                                        <span id="selected_payment_sender">Unknown</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                        <span style="font-weight: 600;">Reference:</span>
+                                        <span id="selected_payment_reference" style="font-family: monospace;">N/A</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <span style="font-weight: 600;">Date:</span>
+                                        <span id="selected_payment_date">Unknown</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Reconciliation Status -->
+                            <div id="reconciliation_status" class="reconciliation-status"
+                                 style="padding: 12px; border-radius: 6px; text-align: center; font-weight: 600; display: none;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Error Message -->
+                    <div id="input_error" class="error-message"
+                         style="display: none; background: #ff4444; color: white; padding: 10px; border-radius: 4px; text-align: center; font-weight: 600; margin-top: 15px;">
+                        ⚠️ Invalid input! Please check your entries.
+                    </div>
+
+                    <!-- Payment Summary -->
+                    <div style="background: rgba(255,255,255,0.9); padding: 15px; border-radius: 6px; margin-top: 20px; border: 1px solid #e0e0e0;">
+                        <div style="text-align: center; margin-bottom: 10px;">
+                            <h6 style="color: #333; margin: 0; font-weight: 600;">💰 Payment Summary</h6>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <span style="font-weight: 600; color: #555;">Total:</span>
+                            <span id="sale_total_display2" style="font-weight: 700; font-size: 16px; color: #333;">KES 0.00</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <span style="font-weight: 600; color: #555;">Payment:</span>
+                            <span id="sale_payment" style="font-weight: 700; font-size: 16px; color: #007bff;">KES 0.00</span>
+                        </div>
+                        <hr style="margin: 10px 0; border: none; border-top: 1px solid #ddd;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight: 600; color: #555;">Change:</span>
+                            <span id="sale_change_display" style="font-weight: 700; font-size: 16px; color: #28a745;">KES 0.00</span>
+                        </div>
+                    </div>
                 </div>
                 <br>
                 <br>
@@ -288,17 +373,20 @@
                     </p>
                 </div>
                 <br>
-                <div class="after-container4" id="checkout_button_container" style="display: none;">
+                <div class="after-container4" id="checkout_button_container" style="opacity: 0.5; pointer-events: none;">
                     <p class="spacer" style="height: 2px;">
-                        
+
                     </p>
-                    <div class="product_type" onclick="add_sale_record()">
+                    <div class="product_type" onclick="add_sale_record()" style="background-color: #ccc; cursor: not-allowed;">
                         <span class="upper_type_label">
                             <h4 class="text-center" style="font-weight: bolder;">Checkout</h4>
                         </span>
                     </div>
+                    <p style="text-align: center; font-size: 12px; color: #666; margin-top: 5px;">
+                        💡 Add payment details first
+                    </p>
                     <p class="spacer" style="height: 8px;">
-                        
+
                     </p>
                 </div>
                 <div class="after-container4" id="print_button_container" style="display: none; position: relative; top: 35%;">
@@ -306,7 +394,7 @@
 
                     </p>
 
-                    <div class="product_type" onclick="download_sale_receipt()">
+                    <div class="product_type" onclick="trigger_print_dialogue()">
                         <span class="upper_type_label">
                             <h4 class="text-center" style="font-weight: bolder;">Print</h4>
                         </span>
@@ -314,9 +402,9 @@
                     <p class="spacer" style="height: 8px;">
 
                     </p>
-                    <div class="product_type" onclick="clear_sale()">
+                    <div class="product_type" onclick="cancel_print_and_clear()">
                         <span class="upper_type_label">
-                            <h4 class="text-center" style="font-weight: bolder;">Clear</h4>
+                            <h4 class="text-center" style="font-weight: bolder;">Cancel</h4>
                         </span>
                     </div>
                     <p class="spacer" style="height: 8px;">

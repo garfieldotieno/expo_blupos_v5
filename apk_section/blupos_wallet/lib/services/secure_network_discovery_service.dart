@@ -258,12 +258,12 @@ class SecureNetworkDiscoveryService {
     // Create server info with fixed IP (should match backend broadcast)
     final serverInfo = SecureServerInfo(
       serverType: 'blupos_backend',
-      ipAddress: '192.168.0.102',  // Use the same IP as backend broadcast
+      ipAddress: '192.168.100.25',  // Use the same IP as backend broadcast
       port: 8080,
       serverName: 'BluPOS Backend Server',
       lastSeen: DateTime.now(),
       timestamp: DateTime.now().millisecondsSinceEpoch,
-      url: 'http://192.168.0.102:8080',
+      url: 'http://192.168.100.25:8080',
     );
 
       // Encrypt server info

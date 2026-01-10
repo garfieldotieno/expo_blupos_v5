@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Receipt Preview</title>
+    <style>
+        @media print {
+            @page {
+                size: 58mm 297mm; /* 58mm width thermal paper for printing */
+                margin: 2mm;
+            }
+        }
+        body {
+            font-family: 'Courier New', monospace;
+            font-size: 8px; /* Smaller for 58mm */
+            line-height: 1.2;
+            color: #000;
+            margin: 0 auto; /* Center the content */
+            padding: 2mm;
+            width: 54mm; /* 58mm - 4mm margins */
+            word-wrap: break-word;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 1px dashed #000;
+            padding-bottom: 2mm;
+            margin-bottom: 2mm;
+        }
+        .header img {
+            max-width: 15mm; /* Smaller for 58mm */
+            max-height: 10mm;
+            margin-bottom: 1mm;
+        }
+        .header h1 {
+            margin: 1mm 0;
+            font-size: 10px; /* Smaller for 58mm */
+            font-weight: bold;
+        }
+        .header p {
+            margin: 0.5mm 0;
+            font-size: 7px; /* Smaller for 58mm */
+        }
+        .section {
+            margin-bottom: 2mm;
+        }
+        .section h3 {
+            font-size: 9px; /* Smaller for 58mm */
+            font-weight: bold;
+            margin: 0 0 1mm 0;
+            padding-bottom: 1mm;
+            border-bottom: 1px dashed #ccc;
+        }
+        .info-table {
+            width: 100%;
+            margin-bottom: 1mm;
+        }
+        .info-table td {
+            padding: 0.5mm 0;
+            vertical-align: top;
+            font-size: 7px; /* Smaller for 58mm */
+        }
+        .info-table .label {
+            font-weight: bold;
+            width: 40%;
+            padding-right: 1mm;
+        }
+        .info-table .value {
+            width: 60%;
+        }
+        .items-section {
+            margin: 2mm 0;
+        }
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 7px; /* Smaller for 58mm */
+        }
+        .items-table th,
+        .items-table td {
+            border: none;
+            padding: 0.5mm 0.25mm;
+            text-align: left;
+        }
+        .items-table th {
+            font-weight: bold;
+            font-size: 8px; /* Smaller for 58mm */
+            border-bottom: 1px dashed #000;
+        }
+        .items-table .text-right {
+            text-align: right;
+        }
+        .items-table .text-center {
+            text-align: center;
+        }
+        .codes-section {
+            text-align: center;
+            margin: 2mm 0;
+            border-top: 1px dashed #000;
+            padding-top: 1mm;
+        }
+        .barcode {
+            margin: 1mm 0;
+        }
+        .barcode img {
+            max-width: 45mm; /* Fit 58mm width */
+            height: auto;
+        }
+        .qrcode {
+            margin: 1mm 0;
+        }
+        .qrcode img {
+            width: 12mm; /* Smaller for 58mm */
+            height: 12mm;
+        }
+        .footer {
+            margin-top: 2mm;
+            text-align: center;
+            border-top: 1px dashed #000;
+            padding-top: 1mm;
+            font-size: 6px; /* Smaller for 58mm */
+        }
+        .footer p {
+            margin: 0.5mm 0;
+        }
+        .divider {
+            border-top: 1px dashed #000;
+            margin: 1mm 0;
+        }
+        .thermal-optimized {
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <img src="/static/assets/{{ shop_data[0]['shop_banner_one'] }}" alt="Shop Logo">
+        <h1>{{ shop_data[0]['pos_shop_name'] }}</h1>
+        <p>{{ shop_data[0]['shop_adress'] }}</p>
+        <p>Tel: {{ shop_data[0]['pos_shop_call_number'] }}</p>
+    </div>
+
+    <div class="section">
+        <h3>TRANSACTION PREVIEW</h3>
+        <table class="info-table">
+            <tr>
+                <td class="label">Transaction ID:</td>
+                <td class="value">{{ transaction_code }}</td>
+            </tr>
+            <tr>
+                <td class="label">Clerk:</td>
+                <td class="value">{{ clerk }}</td>
+            </tr>
+            <tr>
+                <td class="label">Date:</td>
+                <td class="value">{{ current_time[:10] }}</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="items-section">
+        <h3>ITEMS PURCHASED</h3>
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th style="width: 10%;">#</th>
+                    <th style="width: 60%;">Description</th>
+                    <th style="width: 15%;" class="text-right">Qty</th>
+                    <th style="width: 15%;" class="text-right">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ item.name[:18] }}{% if item.name|length > 18 %}...{% endif %}</td>
+                    <td class="text-right">{{ item.quantity }}</td>
+                    <td class="text-right">KES {{ "%.2f"|format(item.price) }}</td>
+                </tr>
+                {% endfor %}
+                <tr class="divider">
+                    <td colspan="4"></td>
+                </tr>
+                <tr>
+                    <td colspan="3" style="text-align: right; font-weight: bold;">SUBTOTAL:</td>
+                    <td class="text-right" style="font-weight: bold;">KES {{ "%.2f"|format(subtotal) }}</td>
+                </tr>
+                <tr>
+                    <td colspan="3" style="text-align: right; font-weight: bold;">VAT (16%):</td>
+                    <td class="text-right" style="font-weight: bold;">KES {{ "%.2f"|format(vat_total) }}</td>
+                </tr>
+                <tr>
+                    <td colspan="3" style="text-align: right; font-weight: bold;">TOTAL:</td>
+                    <td class="text-right" style="font-weight: bold;">KES {{ "%.2f"|format(total) }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h3>RECEIPT INFO</h3>
+        <table class="info-table">
+            <tr>
+                <td class="label">Receipt Code:</td>
+                <td class="value">{{ transaction_code }}</td>
+            </tr>
+            <tr>
+                <td class="label">EAN-13:</td>
+                <td class="value">PREVIEW-{{ transaction_code[:10] }}</td>
+            </tr>
+            <tr>
+                <td class="label">Generated:</td>
+                <td class="value">{{ current_time }}</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="codes-section">
+        {% if barcode_base64 %}
+        <div class="barcode">
+            <img src="{{ barcode_base64 }}" alt="Barcode">
+        </div>
+        {% endif %}
+        {% if qrcode_base64 %}
+        <div class="qrcode">
+            <img src="{{ qrcode_base64 }}" alt="QR Code">
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="footer">
+        <p>*** Blu Property Receipt System ***</p>
+        <p>Preview - Payment required to complete</p>
+        <p>Generated on thermal printer - 58mm width</p>
+    </div>
+</body>
+</html>

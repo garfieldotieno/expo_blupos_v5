@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """
 SMS Payment Message Generator for BluPOS Testing
-Generates sample SMS messages for both supported payment channels (80872 & 57938)
+Generates sample SMS messages for supported payment channels and scam testing
 
 Interactive Mode:
-1. Select payment channel (80872 or 57938)
+1. Select payment channel (80872, 57938, or SCAM)
 2. Enter payment amount
 3. SMS message is generated and displayed
 4. Option to send directly to Android emulator
 
-Shortcodes:
-- 123456: Channel 80872 (Jaystar Investments Ltd)
-- 123457: Channel 57938 (Merchant Account)
+Channels:
+- 80872: Jaystar Investments Ltd (shortcode: 123456)
+- 57938: Merchant Account (shortcode: 123457)
+- SCAM: Scam messages from regular phone numbers (for testing scam prevention)
 
 Usage: python sms_generator.py
 """
@@ -37,6 +38,12 @@ class SMSGenerator:
                 'template': "Dear {recipient}, Your merchant account {account} has been credited with KES {amount} ref #{reference} from {sender} {phone} on {date}.",
                 'sample_senders': ['John Doe', 'Alice Cooper', 'Bob Wilson', 'Carol Taylor', 'David Miller'],
                 'sample_recipients': ['Jeffithah', 'Manager', 'Admin', 'Supervisor', 'Clerk']
+            },
+            'SCAM': {
+                'name': 'Scam Message (Regular Phone Number)',
+                'template': "Payment of KES {amount} has been credited to your account from {sender}. Reference: {reference}. Call {contact} to claim.",
+                'sample_senders': ['Anonymous Sender', 'Payment Service', 'Bank Alert', 'Money Transfer', 'Cash App'],
+                'sample_contacts': ['0712345678', '0723456789', '0734567890', '0745678901', '0756789012']
             }
         }
 
@@ -96,6 +103,21 @@ class SMSGenerator:
                 date=date_str
             )
 
+        elif channel == 'SCAM':
+            # Scam message from regular phone number - should be filtered out
+            sender = random.choice(channel_info['sample_senders'])
+            contact = random.choice(channel_info['sample_contacts'])
+
+            # Generate reference (8 characters, mix of letters and numbers)
+            reference = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+
+            sms = channel_info['template'].format(
+                amount=f"{float(amount):.2f}",
+                sender=sender,
+                reference=reference,
+                contact=contact
+            )
+
         return sms
 
     def send_to_emulator(self, shortcode, sms_message):
@@ -124,6 +146,10 @@ class SMSGenerator:
             return '123456'
         elif channel == '57938':
             return '123457'
+        elif channel == 'SCAM':
+            # Generate a regular 10+ digit phone number for scam messages
+            # Kenyan format: 0712345678, 0723456789, etc.
+            return f'07{random.randint(10000000, 99999999)}'
         else:
             return None
 
@@ -136,7 +162,7 @@ def main():
 ║                  BluPOS SMS Payment Generator                 ║
 ║                                                              ║
 ║  Generate sample SMS messages for testing payment channels   ║
-║  Supported Channels: 80872 (Jaystar) & 57938 (Merchant)     ║
+║  Supported Channels: 80872 (Jaystar), 57938 (Merchant), SCAM ║
 ╚══════════════════════════════════════════════════════════════╝
 """)
 
@@ -156,14 +182,14 @@ def main():
             # Get channel selection
             while True:
                 try:
-                    channel = input("\nSelect channel (80872/57938) or 'quit' to exit: ").strip().lower()
-                    if channel == 'quit':
+                    channel = input("\nSelect channel (80872/57938/SCAM) or 'quit' to exit: ").strip().upper()
+                    if channel == 'QUIT':
                         print("\n👋 Goodbye! Happy testing with BluPOS SMS payments.\n")
                         return
                     if channel in generator.channels:
                         break
                     else:
-                        print("❌ Invalid channel. Please select 80872 or 57938.")
+                        print("❌ Invalid channel. Please select 80872, 57938, or SCAM.")
                 except KeyboardInterrupt:
                     print("\n\n👋 Goodbye! Happy testing with BluPOS SMS payments.\n")
                     return

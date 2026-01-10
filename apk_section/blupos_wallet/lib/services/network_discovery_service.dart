@@ -20,7 +20,8 @@ class DiscoveredServer {
     required this.timestamp,
   });
 
-  String get url => 'http://$ipAddress:$port';
+  // Use port 8080 for HTTP API (backend server), not the discovery port 8888
+  String get url => 'http://$ipAddress:8080';
 
   Map<String, dynamic> toJson() => {
         'serverType': serverType,

@@ -71,44 +71,8 @@ CORS(app, resources={
     r"/get_items_report": {"origins": "*"},
 })
 
-import os
-app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.abspath("instance/pos_test.db")}'
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'connect_args': {
-        'check_same_thread': False,  # Allow multi-threading
-        'timeout': 30.0,  # Connection timeout
-        'isolation_level': None  # Disable transactions for better performance
-    },
-    'pool_pre_ping': True,  # Test connections before use
-    'pool_recycle': 3600,  # Recycle connections every hour
-    'echo': False  # Disable SQL logging for production
-}
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///pos_test.db'
 db = SQLAlchemy(app)
-
-# Configure SQLite WAL mode for better concurrency
-def setup_database():
-    """Setup database with proper configuration"""
-    import os
-    db_path = 'instance/pos_test.db'
-
-    # Ensure instance directory exists
-    os.makedirs('instance', exist_ok=True)
-
-    try:
-        # Enable WAL mode for better concurrency
-        with sqlite3.connect(db_path, timeout=30.0) as conn:
-            conn.execute('PRAGMA journal_mode=WAL;')
-            conn.execute('PRAGMA synchronous=NORMAL;')
-            conn.execute('PRAGMA cache_size=-64000;')  # 64MB cache
-            conn.execute('PRAGMA temp_store=MEMORY;')
-            conn.execute('PRAGMA mmap_size=268435456;')  # 256MB memory map
-            conn.commit()
-        print("✅ Database configured with WAL mode")
-    except Exception as e:
-        print(f"⚠️ Database setup failed: {e}")
-
-# Setup database on startup
-setup_database()
 
 # Initialize SMS reconciliation service
 reconciliation_service = PaymentReconciliationService()
@@ -197,17 +161,9 @@ with app.app_context():
     # Clear SQLAlchemy metadata cache and reflect database schema
     db.metadata.clear()
 
-    # Check if tables exist before creating them
-    print("🔄 Checking database tables...")
-    try:
-        # Test if tables exist by trying to query them
-        db.session.execute(db.text('SELECT 1 FROM account LIMIT 1'))
-        print("✅ Database tables already exist - skipping creation")
-    except:
-        # Tables don't exist, create them
-        print("🔄 Creating database tables...")
-        db.create_all()
-        print("✅ Database tables created successfully")
+    # Force recreate all tables to ensure schema is up to date
+    print("🔄 Recreating all database tables...")
+    db.create_all()
 
     # Verify account_id column exists and populate it if needed
     with db.engine.connect() as conn:
@@ -1750,7 +1706,7 @@ class SaleRecord(db.Model):
     sale_balance = db.Column(db.Float, nullable=False)
     payment_method = db.Column(db.String(20))
     payment_reference = db.Column(db.String(20))
-    payment_gateway = db.Column(db.Enum('223111-476921', '400200-6354', '765244-80872', '0000-0000', 'MPESA_ONLINE'))
+    payment_gateway = db.Column(db.Enum('223111-476921', '400200-6354', '765244-80872', '0000-0000'))
     created_at = db.Column(db.DateTime, default=datetime.now())
     updated_at = db.Column(db.DateTime, default=datetime.now())
 
@@ -2506,10 +2462,10 @@ def download_sale_receipt(sale_id):
 
     print("PDF generated successfully with ReportLab")
 
-    # Return as inline display for iframe
+    # Return as download
     response = make_response(pdf_buffer.read())
     response.headers['Content-Type'] = 'application/pdf'
-    response.headers['Content-Disposition'] = 'inline'
+    response.headers['Content-Disposition'] = f'attachment; filename=receipt_{sale_record.uid}.pdf'
     return response
 
 @app.route('/test-preview-simple')
@@ -2543,7 +2499,11 @@ def preview_sale_receipt():
     try:
         print("=== HTML PREVIEW GENERATION STARTED ===")
 
-
+        # Import required ReportLab units and styles
+        from reportlab.lib.units import inch, mm
+        from reportlab.lib.styles import ParagraphStyle
+        from reportlab.platypus import Paragraph, Spacer
+        from reportlab.lib import colors
 
         # Get parameters from query string
         clerk = request.args.get('clerk', 'Staff')
@@ -2573,8 +2533,8 @@ def preview_sale_receipt():
         shop_data = load_shop_data()
         print(f"Shop data loaded: {shop_data.get('pos_shop_name', 'Unknown')}")
 
-        # Process items for display (matching thermal template format)
-        items_for_display = []
+        # Process items for display
+        items_for_pdf = []
         if items_data:
             for item_str in items_data:
                 try:
@@ -2583,52 +2543,158 @@ def preview_sale_receipt():
                         item_id = parts[0]
                         item_name = parts[1]
                         item_price = float(parts[2])
-                        items_for_display.append({
+                        items_for_pdf.append({
                             'id': item_id,
                             'name': item_name,
-                            'price': item_price,
-                            'quantity': 1  # Default quantity for preview
+                            'price': item_price
                         })
                 except Exception as e:
                     print(f"Error processing item {item_str}: {e}")
                     continue
 
-        print(f"Processed {len(items_for_display)} items for display")
+        print(f"Processed {len(items_for_pdf)} items for PDF display")
 
-        # Calculate totals (matching thermal template)
+        # Generate images (optional for preview)
+        try:
+            barcode_data = f"PREVIEW-{transaction_code}"
+            qrcode_data = f"Preview Receipt\\nTotal: {total}\\nCode: {transaction_code}"
+
+            barcode_img = generate_barcode_image(barcode_data)
+            qrcode_img = generate_qrcode_image(qrcode_data)
+            print("Images generated successfully")
+        except Exception as e:
+            print(f"Image generation failed: {e}")
+            barcode_img = None
+            qrcode_img = None
+
+        # Create PDF buffer - 58mm thermal format (exact 58mm width)
+        pdf_buffer = BytesIO()
+        doc = SimpleDocTemplate(pdf_buffer, pagesize=(58*mm, 297*mm),
+                               leftMargin=2*mm, rightMargin=2*mm,
+                               topMargin=3*mm, bottomMargin=3*mm)
+
+        styles = getSampleStyleSheet()
+
+        # Custom styles matching thermal receipt template exactly
+        header_title_style = ParagraphStyle('HeaderTitle', parent=styles['Heading1'], fontSize=12, alignment=1, spaceAfter=1, leftIndent=0, rightIndent=0, fontName='Courier-Bold')
+        header_normal_style = ParagraphStyle('HeaderNormal', parent=styles['Normal'], fontSize=8, alignment=1, leftIndent=0, rightIndent=0, fontName='Courier')
+        section_title_style = ParagraphStyle('SectionTitle', parent=styles['Heading2'], fontSize=10, spaceAfter=2, leftIndent=0, rightIndent=0, fontName='Courier-Bold')
+        info_style = ParagraphStyle('Info', parent=styles['Normal'], fontSize=8, leftIndent=0, rightIndent=0, fontName='Courier', leading=10)
+        item_style = ParagraphStyle('Item', parent=styles['Normal'], fontSize=8, fontName='Courier', leftIndent=0, rightIndent=0, leading=9)
+        center_style = ParagraphStyle('Center', parent=styles['Normal'], fontSize=8, alignment=1, leftIndent=0, rightIndent=0, fontName='Courier')
+        footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=7, alignment=1, leftIndent=0, rightIndent=0, fontName='Courier')
+
+        story = []
+
+        # Header section with logo (matching thermal template exactly)
+        # Add logo image if available
+        logo_path = os.path.join(os.getcwd(), 'static', 'assets', shop_data.get('shop_banner_one', ''))
+        if os.path.exists(logo_path):
+            try:
+                logo_img = RLImage(logo_path)
+                logo_img.drawWidth = 15*mm  # Smaller for 58mm
+                logo_img.drawHeight = 10*mm
+                story.append(logo_img)
+                story.append(Spacer(1, 2*mm))
+            except:
+                pass  # Skip logo if can't load
+
+        story.append(Paragraph(shop_data['pos_shop_name'], header_title_style))
+        story.append(Paragraph(shop_data['shop_adress'], header_normal_style))
+        story.append(Paragraph(f"Tel: {shop_data['pos_shop_call_number']}", header_normal_style))
+        story.append(Spacer(1, 3*mm))
+
+        # Transaction details section (replaces payment confirmation)
+        # Simple text format matching thermal template
+        story.append(Paragraph(f"Transaction ID: {transaction_code}", info_style))
+        story.append(Paragraph(f"Clerk: {clerk}", info_style))
+        story.append(Paragraph(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}", info_style))
+        story.append(Spacer(1, 3*mm))
+
+        # Transaction details section (replaces payment confirmation)
+        story.append(Paragraph("TRANSACTION DETAILS", section_title_style))
+
+        # Simple text format matching thermal template
+        story.append(Paragraph(f"Transaction ID: {transaction_code}", info_style))
+        story.append(Paragraph(f"Clerk: {clerk}", info_style))
+        story.append(Paragraph(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}", info_style))
+        story.append(Spacer(1, 3*mm))
+
+        # Items section
+        story.append(Paragraph("ITEMS PURCHASED", section_title_style))
+
+        # Simple itemized list (not table) matching thermal template
+        for idx, item in enumerate(items_for_pdf, 1):
+            display_name = item['name'][:20] + ('...' if len(item['name']) > 20 else '')
+            item_line = f"{idx}. {display_name}"
+            story.append(Paragraph(item_line, item_style))
+            qty_price = f"   1 x KES {item['price']:.2f}"
+            story.append(Paragraph(qty_price, item_style))
+
+        story.append(Spacer(1, 2*mm))
+
+        # Calculate totals (simplified for preview)
         subtotal = total / 1.16  # Assuming 16% VAT
         vat_total = total - subtotal
 
-        # Generate barcode and QR code (matching thermal template)
-        try:
-            barcode_data = f"PREVIEW-{transaction_code}"
-            qrcode_data = f"Preview Receipt{chr(10)}Total: {total}{chr(10)}Code: {transaction_code}"
+        # Total section with divider
+        story.append(Paragraph("-" * 25, center_style))
+        story.append(Paragraph(f"SUBTOTAL: KES {subtotal:.2f}", item_style))
+        story.append(Paragraph(f"VAT (16%): KES {vat_total:.2f}", item_style))
+        story.append(Paragraph(f"TOTAL: KES {total:.2f}", item_style))
+        story.append(Spacer(1, 3*mm))
 
-            barcode_base64 = generate_barcode_base64(barcode_data)
-            qrcode_base64 = generate_qrcode_base64(qrcode_data)
-            print("Codes generated successfully")
-        except Exception as e:
-            print(f"Code generation failed: {e}")
-            barcode_base64 = None
-            qrcode_base64 = None
+        # Receipt info section
+        story.append(Paragraph("RECEIPT INFO", section_title_style))
+        story.append(Paragraph(f"Receipt Code: {transaction_code}", info_style))
+        story.append(Paragraph(f"EAN-13: PREVIEW-{transaction_code[:10]}", info_style))
+        story.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", info_style))
+        story.append(Spacer(1, 3*mm))
 
-        # Current time
-        current_time = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        # Codes section
+        story.append(Paragraph("CODES", center_style))
+        story.append(Spacer(1, 2*mm))
 
-        # Return HTML template matching thermal receipt design exactly but scaled to 58mm
-        response = make_response(render_template(
-            'thermal_receipt_preview.html',  # New template for 58mm preview
-            shop_data=[shop_data],  # Wrap in list to match thermal template
-            clerk=clerk,
-            transaction_code=transaction_code,
-            total=total,
-            subtotal=subtotal,
-            vat_total=vat_total,
-            items=items_for_display,
-            barcode_base64=barcode_base64,
-            qrcode_base64=qrcode_base64,
-            current_time=current_time
-        ))
+        # Add barcode if available (matching thermal template sizing)
+        if barcode_img:
+            barcode_buffer = BytesIO()
+            barcode_img.save(barcode_buffer, format='PNG')
+            barcode_buffer.seek(0)
+            barcode_rl_img = RLImage(barcode_buffer)
+            barcode_rl_img.drawWidth = 45*mm  # Fit 58mm width
+            barcode_rl_img.drawHeight = 8*mm
+            story.append(barcode_rl_img)
+            story.append(Spacer(1, 2*mm))
+
+        # Add QR code if available (matching thermal template sizing)
+        if qrcode_img:
+            qrcode_buffer = BytesIO()
+            qrcode_img.save(qrcode_buffer, format='PNG')
+            qrcode_buffer.seek(0)
+            qrcode_rl_img = RLImage(qrcode_buffer)
+            qrcode_rl_img.drawWidth = 15*mm
+            qrcode_rl_img.drawHeight = 15*mm
+            story.append(qrcode_rl_img)
+            story.append(Spacer(1, 2*mm))
+
+        # Footer matching thermal template
+        story.append(Paragraph("-" * 30, center_style))
+        story.append(Paragraph("*** Blu Property Receipt System ***", footer_style))
+        story.append(Paragraph("Thank you for your business!", footer_style))
+        story.append(Paragraph("Generated on thermal printer - 58mm width", footer_style))
+
+        # Build PDF
+        print("Building PDF document...")
+        doc.build(story)
+        pdf_buffer.seek(0)
+
+        pdf_size = len(pdf_buffer.getvalue())
+        print(f"✓ PDF generated successfully! Size: {pdf_size} bytes")
+
+        # Return as inline PDF for iframe display
+        response = make_response(pdf_buffer.read())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = 'inline; filename=receipt_preview.pdf'
         return response
 
     except Exception as e:
@@ -2677,66 +2743,68 @@ def process_incoming_sms_microserver():
             print(f"🔗 [MICROSERVER QUERY] Using reference from microserver: {data['reference']}")
             print(f"🔗 [MICROSERVER QUERY] payment_data['reference'] set to: {payment_data.get('reference', 'NOT_SET')}")
 
-        # Store directly in pending_payment table using Flask-SQLAlchemy
-        # This ensures proper connection pooling and cleanup
+        # Store directly in pending_payment table (data dump - no reconciliation)
+        # Use instance database path to match Flask SQLAlchemy configuration
+        import os
+        instance_db_path = os.path.join(os.getcwd(), 'instance', 'pos_test.db')
+        os.makedirs(os.path.dirname(instance_db_path), exist_ok=True)
+
         try:
-            # Use Flask-SQLAlchemy session for proper connection management
-            from sqlalchemy import text
+            with sqlite3.connect(instance_db_path) as conn:
+                cursor = conn.cursor()
 
-            # Check for duplicate message using SQLAlchemy
-            existing_payment = db.session.execute(
-                text('SELECT id, status FROM pending_payment WHERE channel = :channel AND message = :message'),
-                {'channel': channel, 'message': message}
-            ).fetchone()
+                # Check for duplicate message (atomicity check)
+                cursor.execute('''
+                    SELECT id, status FROM pending_payment
+                    WHERE channel = ? AND message = ?
+                ''', (channel, message))
 
-            if existing_payment:
-                payment_id = existing_payment[0]
-                existing_status = existing_payment[1]
-                print(f"🚫 [MICROSERVER QUERY] Duplicate message detected: ID={payment_id}, Status='{existing_status}'")
-                print(f"📊 [MICROSERVER QUERY] Duplicate prevention: Skipping insertion")
+                existing_record = cursor.fetchone()
 
-                return jsonify({
-                    'status': 'duplicate',
-                    'action': 'duplicate_skipped',
-                    'payment_id': payment_id,
-                    'message': f'Duplicate message detected. Existing payment ID: {payment_id}'
-                })
+                if existing_record:
+                    payment_id = existing_record[0]
+                    existing_status = existing_record[1]
+                    print(f"🚫 [MICROSERVER QUERY] Duplicate message detected: ID={payment_id}, Status='{existing_status}'")
+                    print(f"📊 [MICROSERVER QUERY] Duplicate prevention: Skipping insertion")
 
-            # Insert new payment record using SQLAlchemy
-            result = db.session.execute(
-                text('''
+                    return jsonify({
+                        'status': 'duplicate',
+                        'action': 'duplicate_skipped',
+                        'payment_id': payment_id,
+                        'message': f'Duplicate message detected. Existing payment ID: {payment_id}'
+                    })
+
+                # Insert new payment record
+                cursor.execute('''
                     INSERT INTO pending_payment
                     (channel, amount, account, sender, reference, message, status)
-                    VALUES (:channel, :amount, :account, :sender, :reference, :message, :status)
-                '''),
-                {
-                    'channel': payment_data['channel'],
-                    'amount': payment_data.get('amount', 0),
-                    'account': payment_data.get('account', ''),
-                    'sender': payment_data.get('sender', ''),
-                    'reference': payment_data.get('reference', ''),
-                    'message': payment_data['message'],
-                    'status': 'exported'  # Mark as exported from microserver
-                }
-            )
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    payment_data['channel'],
+                    payment_data.get('amount', 0),
+                    payment_data.get('account', ''),
+                    payment_data.get('sender', ''),
+                    payment_data.get('reference', ''),
+                    payment_data['message'],
+                    'exported'  # Mark as exported from microserver
+                ))
 
-            db.session.commit()
-            payment_id = result.lastrowid
+                payment_id = cursor.lastrowid
+                conn.commit()
 
-            print(f"💾 [MICROSERVER QUERY] Payment data dumped to database: ID={payment_id}")
-            print(f"📊 [MICROSERVER QUERY] Status: exported (microserver dump)")
-            print(f"🔒 [MICROSERVER QUERY] Atomicity ensured: Message hash {message_hash[:16]}... stored")
+                print(f"💾 [MICROSERVER QUERY] Payment data dumped to database: ID={payment_id}")
+                print(f"📊 [MICROSERVER QUERY] Status: exported (microserver dump)")
+                print(f"🔒 [MICROSERVER QUERY] Atomicity ensured: Message hash {message_hash[:16]}... stored")
 
-            return jsonify({
-                'status': 'dumped',
-                'action': 'data_dumped',
-                'payment_id': payment_id,
-                'message_hash': message_hash,
-                'message': f'Payment data dumped to database. ID: {payment_id}'
-            })
+                return jsonify({
+                    'status': 'dumped',
+                    'action': 'data_dumped',
+                    'payment_id': payment_id,
+                    'message_hash': message_hash,
+                    'message': f'Payment data dumped to database. ID: {payment_id}'
+                })
 
         except Exception as db_error:
-            db.session.rollback()
             print(f"❌ [MICROSERVER QUERY] Database error: {db_error}")
             return jsonify({'status': 'error', 'message': f'Database error: {str(db_error)}'}), 500
 
@@ -2761,27 +2829,27 @@ def get_pending_payments():
         # Calculate offset
         offset = (page - 1) * limit
 
-        # Use Flask-SQLAlchemy for proper connection management
-        try:
-            from sqlalchemy import text, func
+        # Use instance database path to match Flask SQLAlchemy configuration
+        import os
+        instance_db_path = os.path.join(os.getcwd(), 'instance', 'pos_test.db')
+        os.makedirs(os.path.dirname(instance_db_path), exist_ok=True)
 
-            # Get total count for pagination metadata using SQLAlchemy (only unreconciled payments)
-            total_count_result = db.session.execute(text('SELECT COUNT(*) FROM pending_payment WHERE status != \'reconciled\'')).scalar()
-            total_count = int(total_count_result) if total_count_result else 0
+        with sqlite3.connect(instance_db_path) as conn:
+            cursor = conn.cursor()
 
-            # Get paginated results using SQLAlchemy (only unreconciled payments)
-            payments_query = db.session.execute(
-                text('''
-                    SELECT id, channel, amount, account, sender, reference, message, status, received_at
-                    FROM pending_payment
-                    WHERE status != 'reconciled'
-                    ORDER BY id DESC
-                    LIMIT :limit OFFSET :offset
-                '''),
-                {'limit': limit, 'offset': offset}
-            )
+            # Get total count for pagination metadata
+            cursor.execute('SELECT COUNT(*) FROM pending_payment')
+            total_count = cursor.fetchone()[0]
 
-            rows = payments_query.fetchall()
+            # Get paginated results
+            cursor.execute('''
+                SELECT id, channel, amount, account, sender, reference, message, status, received_at
+                FROM pending_payment
+                ORDER BY id DESC
+                LIMIT ? OFFSET ?
+            ''', (limit, offset))
+
+            rows = cursor.fetchall()
 
             # Convert to list of dictionaries with formatted datetime
             payments = []
@@ -2791,11 +2859,10 @@ def get_pending_payments():
                 if received_at_raw:
                     try:
                         # Parse SQLite datetime string and format for display
-                        dt = datetime.fromisoformat(str(received_at_raw).replace('Z', '+00:00'))
+                        dt = datetime.fromisoformat(received_at_raw.replace('Z', '+00:00'))
                         # Format as "Jan 9, 2026 9:52 PM" for bottom right display
                         formatted_datetime = dt.strftime('%b %d, %Y %I:%M %p')
-                    except Exception as e:
-                        print(f"Error parsing datetime {received_at_raw}: {e}")
+                    except:
                         formatted_datetime = str(received_at_raw)
                 else:
                     formatted_datetime = 'Unknown'
@@ -2836,153 +2903,9 @@ def get_pending_payments():
                 'count': len(payments)
             })
 
-        except Exception as db_error:
-            print(f"Database error in /api/sms/pending_payments: {db_error}")
-            db.session.rollback()
-            return jsonify({'status': 'error', 'message': 'Database error occurred'}), 500
-
     except Exception as e:
         print(f"Error in /api/sms/pending_payments: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
-
-@app.route('/get_pending_payments', methods=['GET'])
-def get_pending_payments_for_reconciliation():
-    """Get pending payments for M-Pesa Online reconciliation in sales interface"""
-    try:
-        # Use Flask-SQLAlchemy for proper connection management
-        from sqlalchemy import text
-
-        # Get unreconciled payments (status != 'reconciled') using SQLAlchemy
-        payments_query = db.session.execute(
-            text('''
-                SELECT id, channel, amount, account, sender, reference, message, status, received_at
-                FROM pending_payment
-                WHERE status != 'reconciled'
-                ORDER BY id DESC
-                LIMIT 100
-            ''')
-        )
-
-        rows = payments_query.fetchall()
-
-        # Convert to list of dictionaries with formatted display
-        payments = []
-        for row in rows:
-            # Format datetime for display
-            received_at_raw = row[8]
-            if received_at_raw:
-                try:
-                    dt = datetime.fromisoformat(str(received_at_raw).replace('Z', '+00:00'))
-                    formatted_datetime = dt.strftime('%b %d, %Y %I:%M %p')
-                except Exception as e:
-                    print(f"Error parsing datetime {received_at_raw}: {e}")
-                    formatted_datetime = str(received_at_raw)
-            else:
-                formatted_datetime = 'Unknown'
-
-            payment = {
-                'id': row[0],
-                'channel': row[1],
-                'amount': float(row[2]) if row[2] else 0.0,
-                'account': row[3],
-                'sender': row[4],
-                'reference': row[5],
-                'message': row[6],
-                'status': row[7],
-                'received_at': row[8],
-                'display_datetime': formatted_datetime,
-                'display_text': f"KES {float(row[2]) if row[2] else 0.0:.2f} - {row[4] or 'Unknown'} ({formatted_datetime})"
-            }
-            payments.append(payment)
-
-        print(f"📊 Found {len(payments)} pending payments for reconciliation")
-
-        return jsonify({
-            'status': 'success',
-            'payments': payments,
-            'count': len(payments)
-        })
-
-    except Exception as e:
-        print(f"Error in /get_pending_payments: {e}")
-        db.session.rollback()
-        return jsonify({'status': 'error', 'message': 'Database error occurred'}), 500
-
-@app.route('/reconcile_mpesa_payment', methods=['POST'])
-def reconcile_mpesa_payment():
-    """Reconcile M-Pesa Online payment with sale"""
-    try:
-        data = request.get_json()
-
-        if not data:
-            return jsonify({"status": "error", "message": "No data provided"}), 400
-
-        payment_id = data.get('payment_id')
-        sale_total = data.get('sale_total')
-
-        if not payment_id or sale_total is None:
-            return jsonify({"status": "error", "message": "Missing payment_id or sale_total"}), 400
-
-        print(f"🔄 Reconciling payment ID {payment_id} with sale total KES {sale_total}")
-
-        # Use Flask-SQLAlchemy for proper connection management
-        from sqlalchemy import text
-
-        # Get the payment details using SQLAlchemy
-        payment_query = db.session.execute(
-            text('SELECT id, amount, status FROM pending_payment WHERE id = :payment_id'),
-            {'payment_id': payment_id}
-        )
-
-        payment_row = payment_query.fetchone()
-        if not payment_row:
-            return jsonify({"status": "error", "message": "Payment not found"}), 404
-
-        payment_amount = float(payment_row[1]) if payment_row[1] else 0.0
-        payment_status = payment_row[2]
-
-        if payment_status == 'reconciled':
-            return jsonify({"status": "error", "message": "Payment already reconciled"}), 400
-
-        print(f"💰 Payment amount: KES {payment_amount}, Sale total: KES {sale_total}")
-
-        # Check if payment amount is sufficient (>= sale_total) like cash payments
-        if payment_amount < sale_total:
-            print(f"❌ Insufficient payment: Payment KES {payment_amount} < Sale KES {sale_total}")
-            return jsonify({
-                "status": "reconciliation_failed",
-                "message": f"Insufficient payment: Payment is KES {payment_amount:.2f}, but sale total is KES {sale_total:.2f}",
-                "payment_amount": payment_amount,
-                "sale_total": sale_total
-            }), 400
-
-        # Calculate change/balance for overpayments
-        change_amount = payment_amount - sale_total
-        print(f"✅ Payment sufficient: Payment KES {payment_amount}, Sale KES {sale_total}, Change KES {change_amount}")
-
-        # Reconciliation successful - update payment status using SQLAlchemy
-        db.session.execute(
-            text('UPDATE pending_payment SET status = :status WHERE id = :payment_id'),
-            {'status': 'reconciled', 'payment_id': payment_id}
-        )
-
-        db.session.commit()
-
-        print(f"✅ Payment ID {payment_id} reconciled successfully")
-
-        return jsonify({
-            "status": "reconciliation_success",
-            "message": f"Payment reconciled successfully: KES {payment_amount:.2f} (Change: KES {change_amount:.2f})",
-            "payment_id": payment_id,
-            "reconciled_amount": payment_amount,
-            "sale_total": sale_total,
-            "change_amount": change_amount
-        })
-
-    except Exception as e:
-        db.session.rollback()
-        print(f"Error in reconcile_mpesa_payment: {e}")
-        return jsonify({'status': 'error', 'message': 'Database error occurred'}), 500
 
 @app.route('/api/sms/reconcile', methods=['POST'])
 def reconcile_sms_payment():
@@ -3193,7 +3116,7 @@ def generate_activation_qr():
     """Generate QR code for device activation (first-time activation)"""
     try:
         # Use fixed server IP for BluPOS deployment
-        fixed_server_ip = "192.168.100.25"
+        fixed_server_ip = "192.168.0.102"
         server_port = int(os.environ.get('PORT', 8080))
 
         server_info = {
@@ -3941,12 +3864,12 @@ class SecureNetworkDiscoveryService:
             # Create server info with fixed IP
             server_info = {
                 'server_type': 'blupos_backend',
-                'ip_address': '192.168.100.25',  # Fixed server IP
+                'ip_address': '192.168.0.102',  # Fixed server IP
                 'port': self.port,
                 'server_name': 'BluPOS Backend Server',
                 'last_seen': now.isoformat(),
                 'timestamp': int(now.timestamp()),
-                'url': f'http://192.168.100.25:{self.port}'
+                'url': f'http://192.168.0.102:{self.port}'
             }
             
             # Encrypt server info
