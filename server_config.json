@@ -1,0 +1,9 @@
+{
+  "server_ip": "192.168.0.102",
+  "server_port": 8080,
+  "server_name": "BluPOS Backend Server",
+  "server_type": "blupos_backend",
+  "discovered_at": 1768238807.5633552,
+  "broadcast_addr": "192.168.0.102:53594",
+  "raw_datagram": "{\"server_type\": \"blupos_backend\", \"ip_address\": \"192.168.0.102\", \"port\": 8080, \"server_name\": \"BluPOS Backend Server\", \"timestamp\": 1768238807}"
+}

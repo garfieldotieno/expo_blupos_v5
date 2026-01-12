@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
+import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/micro_server_service.dart';
 import '../services/heartbeat_service.dart';
@@ -25,55 +26,140 @@ class _ActivationPageState extends State<ActivationPage> {
   final TextEditingController _activationCodeController = TextEditingController();
   final TextEditingController _deviceNameController = TextEditingController();
   final TextEditingController _serverIpController = TextEditingController();
-  String _statusMessage = 'Discovering BluPOS server...';
+  String _statusMessage = 'Ready to activate. Enter activation code.';
   bool _isActivating = false;
-  bool _serverDiscovered = false;
-  SecureNetworkDiscoveryService? _discoveryService;
+  bool _serverReady = true; // Server IP is pre-populated from boot discovery
 
   @override
   void initState() {
     super.initState();
     _deviceNameController.text = 'BluPOS Wallet ${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
-    _initializeNetworkDiscovery();
+    _loadServerConfiguration();
   }
 
-  Future<void> _initializeNetworkDiscovery() async {
+  Future<void> _loadServerConfiguration() async {
     try {
-      // Initialize network discovery service
-      _discoveryService = SecureNetworkDiscoveryService();
-      await _discoveryService!.initialize();
-      await _discoveryService!.startDiscovery();
+      print('🔍 [ACTIVATION] Loading server configuration from SharedPreferences...');
 
-      // Listen for discovered servers
-      _discoverySubscription = _discoveryService!.discoveredServers.listen((servers) {
-        if (servers.isNotEmpty && !_serverDiscovered) {
-          final bestServer = _discoveryService!.getBestServer();
-          if (bestServer != null) {
-            setState(() {
-              _serverIpController.text = bestServer.ipAddress; // Just IP, no port
-              _serverDiscovered = true;
-              _statusMessage = 'Server found. Enter activation code.';
-              print('✅ Auto-discovered server: ${bestServer.ipAddress}:${bestServer.port}');
-            });
+      // Load the server IP that was discovered during app boot
+      final prefs = await SharedPreferences.getInstance();
+      final savedServerIp = prefs.getString('server_ip');
+
+      print('🔍 [ACTIVATION] Saved server IP from preferences: $savedServerIp');
+
+      if (savedServerIp != null && savedServerIp.isNotEmpty) {
+        // Extract just the IP part (remove port if present)
+        final ipOnly = savedServerIp.split(':').first;
+        setState(() {
+          _serverIpController.text = ipOnly;
+          _statusMessage = 'Server configuration loaded. Enter activation code.';
+        });
+        print('✅ [ACTIVATION] Loaded server IP from boot discovery: $ipOnly');
+        print('📡 [ACTIVATION] Server configuration ready for activation');
+      } else {
+        // For testing/development: Use a known backend IP if none is saved
+        print('⚠️ [ACTIVATION] No server IP found in preferences - checking for backend broadcasts...');
+
+        // Try to find backend server via UDP broadcast
+        final backendConfig = await _scanForBackendBroadcast();
+        if (backendConfig != null) {
+          final discoveredIp = backendConfig['server_ip'];
+          setState(() {
+            _serverIpController.text = discoveredIp;
+            _statusMessage = 'Backend server found. Enter activation code.';
+          });
+          print('✅ [ACTIVATION] Discovered backend server via broadcast: $discoveredIp');
+
+          // Save the discovered IP for future use
+          await prefs.setString('server_ip', '$discoveredIp:8080');
+        } else {
+          // Fallback for development/testing
+          const fallbackIp = '192.168.0.102'; // Known backend server IP
+          setState(() {
+            _serverIpController.text = fallbackIp;
+            _statusMessage = 'Using fallback server IP. Enter activation code.';
+          });
+          print('⚠️ [ACTIVATION] Using fallback server IP: $fallbackIp');
+          print('📝 [ACTIVATION] To use real backend, ensure server is broadcasting on UDP port 8888');
+        }
+      }
+    } catch (e) {
+      print('❌ [ACTIVATION] Error loading server configuration: $e');
+      setState(() {
+        _statusMessage = 'Error loading server configuration.';
+        _serverReady = false;
+      });
+    }
+  }
+
+  Future<Map<String, dynamic>?> _scanForBackendBroadcast() async {
+    print('🔍 [ACTIVATION] Scanning for backend server broadcasts...');
+    print('📡 [ACTIVATION] Listening on UDP multicast group: 239.255.1.1:8888');
+
+    try {
+      // Create UDP socket for multicast reception (similar to CLI demo)
+      final socket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 8888);
+      socket.multicastHops = 2;
+
+      // Join multicast group
+      final groupAddress = InternetAddress('239.255.1.1');
+      socket.joinMulticast(groupAddress);
+
+      print('📡 [ACTIVATION] UDP socket bound and joined multicast group');
+
+      // Listen for broadcasts with timeout
+      final completer = Completer<Map<String, dynamic>?>();
+
+      socket.listen((event) {
+        if (event == RawSocketEvent.read) {
+          final datagram = socket.receive();
+          if (datagram != null) {
+            final message = String.fromCharCodes(datagram.data);
+            print('📨 [ACTIVATION] RECEIVED BROADCAST DATAGRAM:');
+            print('   From: ${datagram.address}:${datagram.port}');
+            print('   Raw data: $message');
+
+            try {
+              final serverInfo = jsonDecode(message);
+              print('   Parsed data: $serverInfo');
+
+              if (serverInfo['server_type'] == 'blupos_backend') {
+                print('✅ [ACTIVATION] Valid BLUPOS backend server found!');
+                socket.close();
+
+                final config = {
+                  'server_ip': serverInfo['ip_address'],
+                  'server_port': serverInfo['port'],
+                  'server_name': serverInfo['server_name'],
+                  'raw_datagram': message,
+                };
+
+                completer.complete(config);
+                return;
+              } else {
+                print('⚠️ [ACTIVATION] Ignoring non-BLUPOS broadcast: ${serverInfo['server_type']}');
+              }
+            } catch (e) {
+              print('⚠️ [ACTIVATION] Failed to parse broadcast datagram: $e');
+            }
           }
         }
       });
 
-      print('🔍 Network discovery started - waiting for server broadcast...');
-
-      // Set timeout for discovery
-      Future.delayed(const Duration(seconds: 10), () {
-        if (!mounted || _serverDiscovered) return;
-        setState(() {
-          _statusMessage = 'No server found. Please ensure BluPOS server is running.';
-        });
+      // Timeout after 5 seconds
+      Future.delayed(const Duration(seconds: 5), () {
+        if (!completer.isCompleted) {
+          print('⏰ [ACTIVATION] Broadcast scan timeout - no backend servers found');
+          socket.close();
+          completer.complete(null);
+        }
       });
+
+      return await completer.future;
 
     } catch (e) {
-      print('❌ Network discovery failed: $e');
-      setState(() {
-        _statusMessage = 'Discovery failed. Please restart the app.';
-      });
+      print('❌ [ACTIVATION] Broadcast scanning failed: $e');
+      return null;
     }
   }
 
@@ -331,8 +417,8 @@ class _ActivationPageState extends State<ActivationPage> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Only show fields after server discovery
-                    if (_serverDiscovered) ...[
+                    // Show fields immediately with pre-populated IP
+                    if (_serverReady) ...[
                       // Server IP Input Field (Read-only, shown after discovery)
                       TextFormField(
                         controller: _serverIpController,
@@ -455,12 +541,8 @@ class _ActivationPageState extends State<ActivationPage> {
     );
   }
 
-  StreamSubscription<List<SecureServerInfo>>? _discoverySubscription;
-
   @override
   void dispose() {
-    _discoverySubscription?.cancel();
-    _discoveryService?.stopDiscovery();
     _activationCodeController.dispose();
     _serverIpController.dispose();
     super.dispose();

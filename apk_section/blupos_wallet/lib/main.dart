@@ -12,8 +12,7 @@ import 'pages/activation_page.dart';
 import 'utils/api_client.dart';
 import 'services/micro_server_service.dart';
 import 'services/heartbeat_service.dart';
-import 'services/network_discovery_service.dart';
-import 'services/secure_network_discovery_service.dart';
+
 import 'services/sms_service.dart';
 import 'widgets/blinking_sms_icon.dart';
 import 'widgets/sms_indicator.dart';
@@ -98,9 +97,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   int _currentUnreadCount = 0;
   double _totalSales = 0.0;
 
-  // Network discovery service
-  final NetworkDiscoveryService _networkDiscovery = NetworkDiscoveryService();
-  late StreamSubscription<List<DiscoveredServer>> _discoverySubscription;
+
 
   // Reactive payments data
   List<Map<String, dynamic>> _paymentsData = [];
@@ -171,7 +168,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       });
     }
 
-    _startNetworkDiscovery();
     _loadAppState();
   }
 
@@ -179,8 +175,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   void dispose() {
     _smsArrivalSubscription.cancel();
     _unreadCountSubscription.cancel();
-    _discoverySubscription.cancel();
-    _networkDiscovery.stopDiscovery();
     _paymentsRefreshTimer?.cancel();
     _smsSyncTimer?.cancel();
     super.dispose();
@@ -188,80 +182,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
 
 
-  // Start network discovery and listen for discovered servers
-  void _startNetworkDiscovery() {
-    try {
-      // Disable verbose network discovery logging to reduce log noise during SMS debugging
-      SecureNetworkDiscoveryService.disableVerboseLogging();
-      print('🔍 [MAIN] Starting network discovery integration (verbose logging disabled)...');
-      _networkDiscovery.startDiscovery();
-      
-      _discoverySubscription = _networkDiscovery.discoveredServers.listen((servers) {
-        print('📡 [MAIN] Discovered ${servers.length} servers: ${servers.map((s) => '${s.serverName} at ${s.url}').join(', ')}');
-        
-        // Auto-connect to the best server if we have one and no connection failures
-        if (servers.isNotEmpty) {
-          print('🔄 [MAIN] Attempting auto-connect to discovered servers...');
-          _attemptAutoConnect(servers);
-        } else {
-          print('⚠️ [MAIN] No servers discovered yet, continuing to listen...');
-        }
-      });
-      
-      print('✅ [MAIN] Network discovery integration started successfully');
-      print('📡 [MAIN] Listening for UDP broadcasts on port 8888');
-      print('📡 [MAIN] Multicast group: 239.255.1.1');
-    } catch (e) {
-      print('❌ [MAIN] Failed to start network discovery: $e');
-    }
-  }
 
-  // Attempt to auto-connect to discovered servers
-  Future<void> _attemptAutoConnect(List<DiscoveredServer> servers) async {
-    try {
-      print('🔄 [MAIN] Auto-connect triggered with ${servers.length} servers');
-      
-      // Get the best server (prioritizes BluPOS backend)
-      final bestServer = _networkDiscovery.getBestServer();
-      if (bestServer == null) {
-        print('❌ [MAIN] No best server found');
-        return;
-      }
-
-      print('🔄 [MAIN] Attempting auto-connect to: $bestServer');
-      print('🔄 [MAIN] Server URL: ${bestServer.url}');
-
-      // Test connection to the discovered server
-      final isConnected = await _networkDiscovery.testServerConnection(bestServer);
-      
-      if (isConnected) {
-        print('✅ [MAIN] Successfully connected to discovered server: ${bestServer.url}');
-        
-        // Update the backend URL in preferences
-        final prefs = await SharedPreferences.getInstance();
-        final newServerIp = '${bestServer.ipAddress}:${bestServer.port}';
-        await prefs.setString('server_ip', newServerIp);
-        print('✅ [MAIN] Updated server IP in preferences: $newServerIp');
-        
-        // Update API client with new URL
-        await ApiClient.updateBackendUrl(bestServer.url);
-        print('✅ [MAIN] Updated API client backend URL: ${bestServer.url}');
-        
-        // Reset connection failure counter
-        await prefs.setInt('connection_failures', 0);
-        print('✅ [MAIN] Reset connection failure counter');
-        
-        
-        // Reload app state with new connection
-        print('🔄 [MAIN] Reloading app state with new connection...');
-        await _loadAppState();
-      } else {
-        print('❌ [MAIN] Failed to connect to discovered server: ${bestServer.url}');
-      }
-    } catch (e) {
-      print('❌ [MAIN] Auto-connect failed: $e');
-    }
-  }
 
 
 
@@ -1274,7 +1195,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       final transactionId = payment['transaction_id'] ?? 'N/A';
 
                       final adjustedDateTime = datetime.isNotEmpty
-                          ? DateTime.tryParse(datetime)?.add(const Duration(hours: 2))?.toLocal()
+                          ? DateTime.tryParse(datetime)?.add(const Duration(hours: 3))?.toLocal()
                           : null;
 
                       final timeDisplay = adjustedDateTime != null

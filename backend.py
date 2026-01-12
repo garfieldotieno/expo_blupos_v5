@@ -1675,7 +1675,7 @@ def get_sale_record_printout():
                 format_currency(record.sale_paid_amount),
                 format_currency(record.sale_balance),
                 record.payment_method or 'Cash',
-                record.created_at.strftime('%Y-%m-%d %H:%M')
+                (record.created_at + timedelta(hours=3)).strftime('%Y-%m-%d %H:%M')
             ])
 
         # Create table with multiple rows per page

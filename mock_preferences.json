@@ -1,0 +1,15 @@
+{
+  "network_details": {
+    "server_ip": "192.168.1.100",
+    "server_port": 8080,
+    "server_type": "BLUPOS_BACKEND",
+    "network_id": "BLUPOS_NET_001",
+    "api_version": "v1",
+    "capabilities": [
+      "activation",
+      "licensing",
+      "sync"
+    ]
+  },
+  "is_activated": false
+}
