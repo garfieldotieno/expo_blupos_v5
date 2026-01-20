@@ -1091,57 +1091,66 @@ def get_total_sales():
 
 @app.route('/get_items_report', methods=['GET'])
 def get_items_report():
-    """Get comprehensive items report for APK interface display"""
+    """Generate thermal receipt format (58mm) for items report with restock integration"""
     # Allow access for APK interface without session authentication
-    # This endpoint is for APK data display, not web interface
+
+    # Get all items with stock information
+    items = SaleItem.query.all()
+    stock_data = {}
+    for stock in SaleItemStockCount.query.all():
+        stock_data[stock.item_uid] = stock
+
+    # Calculate sales data per item
+    sales_data = {}
+    transactions = SaleItemTransaction.query.all()
+    for transaction in transactions:
+        uid = transaction.item_uid
+        if uid not in sales_data:
+            sales_data[uid] = 0
+        sales_data[uid] += transaction.transaction_quantity
+
+    # Get restock items using existing method
+    restock_items = InventoryOperations.generate_restock_list()
+
+    # Build items report with restock data
+    items_report = []
+    total_value = 0
+    total_items = 0
+    low_stock_count = 0
+
+    for item in items:
+        stock = stock_data.get(item.uid)
+        units_sold = sales_data.get(item.uid, 0)
+        current_stock = stock.current_stock_count if stock else 0
+        restock_value = stock.re_stock_value if stock else 0
+        item_value = current_stock * item.price
+
+        total_value += item_value
+        total_items += 1
+        if current_stock < restock_value:
+            low_stock_count += 1
+
+        items_report.append({
+            "name": item.name,
+            "upc_code": item.uid,
+            "current_stock": current_stock,
+            "restock_value": restock_value,
+            "price": float(item.price),
+            "item_value": float(item_value),
+            "units_sold": units_sold,
+            "item_type": item.item_type,
+            "low_stock": current_stock < restock_value,
+            "needs_restock": current_stock < restock_value
+        })
+
+    # Handle session gracefully for APK requests
+    try:
+        user_name = user_from_session()
+    except:
+        user_name = {"user_name": "APK User"}
 
     # Check if request wants HTML for iframe display
     if request.args.get('format') == 'html':
-        # Get all items with stock information
-        items = SaleItem.query.all()
-        stock_data = {}
-        for stock in SaleItemStockCount.query.all():
-            stock_data[stock.item_uid] = stock
-
-        # Calculate sales data per item
-        sales_data = {}
-        transactions = SaleItemTransaction.query.all()
-        for transaction in transactions:
-            uid = transaction.item_uid
-            if uid not in sales_data:
-                sales_data[uid] = 0
-            sales_data[uid] += transaction.transaction_quantity
-
-        # Build items report
-        items_report = []
-        total_value = 0
-        total_items = 0
-        low_stock_count = 0
-
-        for item in items:
-            stock = stock_data.get(item.uid)
-            units_sold = sales_data.get(item.uid, 0)
-            current_stock = stock.current_stock_count if stock else 0
-            restock_value = stock.re_stock_value if stock else 0
-            item_value = current_stock * item.price
-
-            total_value += item_value
-            total_items += 1
-            if current_stock < restock_value:
-                low_stock_count += 1
-
-            items_report.append({
-                "name": item.name,
-                "upc_code": item.uid,
-                "current_stock": current_stock,
-                "restock_value": restock_value,
-                "price": float(item.price),
-                "item_value": float(item_value),
-                "units_sold": units_sold,
-                "item_type": item.item_type,
-                "low_stock": current_stock < restock_value
-            })
-
         # Sales summary by clerk
         clerk_sales = {}
         for record in SaleRecord.query.all():
@@ -1152,7 +1161,6 @@ def get_items_report():
             clerk_sales[clerk]["total_sales"] += record.sale_total
 
         shop_data = load_shop_data()
-        user_name = user_from_session()
 
         response = make_response(render_template(
             'items_report_html.html',
@@ -1163,28 +1171,313 @@ def get_items_report():
             user_type='APK',
             user_name=user_name,
             shop_data=[shop_data],
-            items=items_report[:500],  # Limit to 500 items for display
+            items=items_report[:500],
+            restock_items=restock_items[:20],  # Include restock items
             summary={
                 "total_items": total_items,
                 "total_value": float(total_value),
                 "low_stock_count": low_stock_count,
+                "restock_count": len(restock_items),
                 "clerk_sales": clerk_sales
             },
             datetime=datetime
         ))
         return response
 
-    # Generate PDF directly in landscape A4 format
-    try:
-        print("Starting PDF generation data preparation...")
-        # Get all items with stock information
-        items = SaleItem.query.all()
-        print(f"Found {len(items)} items")
-        stock_data = {}
-        for stock in SaleItemStockCount.query.all():
-            stock_data[stock.item_uid] = stock
+    # Generate thermal receipt PDF (58mm width, portrait orientation)
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib import colors
+    from reportlab.lib.units import mm
 
-        # Calculate sales data per item
+    pdf_buffer = BytesIO()
+
+    # 58mm thermal receipt dimensions (portrait)
+    receipt_width = 48 * mm
+    receipt_height = 297 * mm
+
+    doc = SimpleDocTemplate(
+        pdf_buffer,
+        pagesize=(receipt_width, receipt_height),
+        leftMargin=2*mm,
+        rightMargin=2*mm,
+        topMargin=3*mm,
+        bottomMargin=3*mm
+    )
+
+    styles = getSampleStyleSheet()
+
+    # Thermal receipt styles
+    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=10, alignment=1, spaceAfter=3, fontName='Courier-Bold')
+    normal_style = ParagraphStyle('Normal', parent=styles['Normal'], fontSize=7, leading=8, fontName='Courier')
+    center_style = ParagraphStyle('Center', parent=styles['Normal'], fontSize=7, alignment=1, spaceAfter=2, fontName='Courier')
+    item_style = ParagraphStyle('Item', parent=styles['Normal'], fontSize=6, leading=7, fontName='Courier')
+
+    story = []
+
+    # Header
+    shop_data = load_shop_data()
+    story.append(Paragraph(shop_data['pos_shop_name'][:20], title_style))
+    story.append(Paragraph(shop_data['shop_adress'][:25], center_style))
+    story.append(Paragraph(f"Tel: {shop_data['pos_shop_call_number']}", center_style))
+    story.append(Paragraph("=" * 25, center_style))
+    story.append(Paragraph("INVENTORY & RESTOCK REPORT", center_style))
+    story.append(Paragraph("=" * 25, center_style))
+    story.append(Spacer(1, 2*mm))
+
+    # Performance Summary section
+    def format_currency(amount):
+        return f"KES {amount:,.2f}"
+
+    # Calculate performance metrics
+    total_items_sold_today = sum(item['units_sold'] for item in items_report)
+    total_sales_value_today = sum(item['units_sold'] * item['price'] for item in items_report)
+
+    story.append(Paragraph("PERFORMANCE SUMMARY", center_style))
+    story.append(Paragraph("=" * 25, center_style))
+    story.append(Paragraph(f"Items Sold Today: {total_items_sold_today}", normal_style))
+    story.append(Paragraph(f"Sales Value: {format_currency(total_sales_value_today)}", normal_style))
+    story.append(Paragraph(f"Avg Item Value: {format_currency(total_sales_value_today / max(total_items_sold_today, 1))}", normal_style))
+    story.append(Spacer(1, 2*mm))
+
+
+
+
+
+    # Top 20 Performers by Sales Value
+    if items_report:
+        # Calculate sales value for each item and sort
+        performers = []
+        for item in items_report:
+            if item['units_sold'] > 0:  # Only include items with sales
+                sales_value = item['units_sold'] * item['price']
+                performers.append({
+                    'name': item['name'],
+                    'units_sold': item['units_sold'],
+                    'sales_value': sales_value,
+                    'percentage': (sales_value / total_sales_value_today * 100) if total_sales_value_today > 0 else 0
+                })
+
+        # Sort by sales value (highest first)
+        performers.sort(key=lambda x: x['sales_value'], reverse=True)
+
+        # Take top 20
+        top_performers = performers[:20]
+
+        if top_performers:
+            story.append(Paragraph("TOP 20 PERFORMERS", center_style))
+            story.append(Paragraph("By Sales Value", center_style))
+            story.append(Paragraph("=" * 30, center_style))
+            story.append(Spacer(1, 1*mm))
+
+            for i, performer in enumerate(top_performers, 1):
+                story.append(Paragraph(f"{i:2d}. {performer['name'][:18]}", item_style))
+                story.append(Paragraph(f"    Sold: {performer['units_sold']} | Value: {format_currency(performer['sales_value'])}", item_style))
+                story.append(Paragraph(f"    % of Total: {performer['percentage']:.1f}%", item_style))
+                story.append(Paragraph("-" * 25, center_style))
+                story.append(Spacer(1, 1*mm))
+
+            story.append(Spacer(1, 2*mm))
+
+    # Inventory Summary
+    story.append(Paragraph("INVENTORY SUMMARY", center_style))
+    story.append(Paragraph("=" * 25, center_style))
+    story.append(Paragraph(f"Total Items: {total_items}", item_style))
+    story.append(Paragraph(f"Total Value: {format_currency(total_value)}", item_style))
+    story.append(Paragraph(f"Low Stock: {low_stock_count}", item_style))
+    story.append(Paragraph(f"Need Restock: {len(restock_items)}", item_style))
+    story.append(Spacer(1, 2*mm))
+
+    # Restock section (if any items need restocking)
+    if restock_items:
+        story.append(Paragraph("-" * 30, center_style))
+        story.append(Paragraph("🚨 RESTOCK REQUIRED 🚨", center_style))
+        story.append(Paragraph("-" * 30, center_style))
+        story.append(Spacer(1, 1*mm))
+
+        for item in restock_items[:10]:  # Limit to 10 for thermal receipt
+            current_stock = item.current_stock_count
+            restock_level = item.re_stock_value
+            needed = restock_level - current_stock
+
+            story.append(Paragraph(f"Item: {item.name[:15]}", item_style))
+            story.append(Paragraph(f"Current: {current_stock}", item_style))
+            story.append(Paragraph(f"Needed: {needed} (Level: {restock_level})", item_style))
+            story.append(Paragraph("-" * 20, center_style))
+            story.append(Spacer(1, 1*mm))
+
+    # Low stock alerts section
+    low_stock_items = [item for item in items_report if item['low_stock']][:5]  # Top 5
+    if low_stock_items:
+        story.append(Paragraph("-" * 30, center_style))
+        story.append(Paragraph("⚠️ LOW STOCK ALERTS ⚠️", center_style))
+        story.append(Paragraph("-" * 30, center_style))
+        story.append(Spacer(1, 1*mm))
+
+        for item in low_stock_items:
+            story.append(Paragraph(f"{item['name'][:18]}", item_style))
+            story.append(Paragraph(f"Stock: {item['current_stock']}/{item['restock_value']}", item_style))
+            story.append(Paragraph("-" * 15, center_style))
+            story.append(Spacer(1, 1*mm))
+
+    # Generate thermal barcode and QR code
+    try:
+        receipt_code = f"INVENTORY-{datetime.now().strftime('%H%M%S')}"
+        qr_data = f"Inventory Report\nItems: {total_items}\nValue: {format_currency(total_value)}\nLow Stock: {low_stock_count}\nRestock: {len(restock_items)}\nCode: {receipt_code}"
+
+        # Generate QR code (smaller for thermal)
+        qr = qrcode.QRCode(version=1, box_size=3, border=1)
+        qr.add_data(qr_data)
+        qr.make(fit=True)
+        qr_img = qr.make_image(fill_color="black", back_color="white")
+
+        # Generate barcode (compact)
+        barcode_img = generate_barcode_image(receipt_code)
+
+        if qr_img and barcode_img:
+            # Convert images for ReportLab
+            qr_buffer = BytesIO()
+            qr_img.save(qr_buffer, format='PNG')
+            qr_buffer.seek(0)
+            qr_rl_img = RLImage(qr_buffer)
+            qr_rl_img.drawWidth = 15 * mm
+            qr_rl_img.drawHeight = 15 * mm
+
+            barcode_buffer = BytesIO()
+            barcode_img.save(barcode_buffer, format='PNG')
+            barcode_buffer.seek(0)
+            barcode_rl_img = RLImage(barcode_buffer)
+            barcode_rl_img.drawWidth = 35 * mm
+            barcode_rl_img.drawHeight = 8 * mm
+
+            # Center both images
+            story.append(Spacer(1, 3*mm))
+            story.append(qr_rl_img)
+            story.append(Spacer(1, 2*mm))
+            story.append(barcode_rl_img)
+            story.append(Paragraph(receipt_code, center_style))
+
+    except Exception as e:
+        print(f"Thermal code generation failed: {e}")
+        story.append(Paragraph(f"Code: {receipt_code}", center_style))
+
+    # Footer
+    story.append(Spacer(1, 3*mm))
+    story.append(Paragraph("Generated for inventory management", center_style))
+    story.append(Paragraph(f"Time: {datetime.now().strftime('%m/%d/%y %H:%M')}", center_style))
+
+    # Build thermal receipt PDF
+    doc.build(story)
+    pdf_buffer.seek(0)
+
+    print("Thermal items & restock receipt PDF generated successfully (58mm)")
+
+    # Return as inline display for thermal printing
+    response = make_response(pdf_buffer.read())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = 'inline; filename=thermal_inventory_receipt.pdf'
+    return response
+
+# NEW DIRECT DATA ENDPOINTS FOR THERMAL PRINTING UX UPGRADE
+# These endpoints provide JSON data directly for thermal printing instead of PDFs
+
+@app.route('/api/sales_report_data', methods=['GET'])
+def get_sales_report_data():
+    """Return sales report data as JSON for direct thermal printing (UX upgrade)"""
+    try:
+        # Allow access for APK interface without session authentication
+        print("🔄 [DIRECT-API] Fetching sales report data for thermal printing")
+
+        # Get sales records with optional date filtering (same logic as PDF generation)
+        start_date_str = request.args.get('start_date')
+        end_date_str = request.args.get('end_date')
+
+        # Parse dates if provided
+        start_date = None
+        end_date = None
+        if start_date_str and end_date_str:
+            try:
+                start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+                end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
+                end_date = end_date.replace(hour=23, minute=59, second=59)
+            except ValueError:
+                start_date = None
+                end_date = None
+
+        # Query sales records (same as PDF generation)
+        if start_date and end_date:
+            sale_records = SaleRecord.query.filter(
+                SaleRecord.created_at >= start_date,
+                SaleRecord.created_at <= end_date
+            ).order_by(SaleRecord.created_at.desc()).all()
+        else:
+            sale_records = SaleRecord.query.order_by(SaleRecord.created_at.desc()).all()
+
+        # Calculate fiscal summary (same logic as PDF generation)
+        total_sales = sum(record.sale_total for record in sale_records)
+        total_paid = sum(record.sale_paid_amount for record in sale_records)
+        total_balance = sum(record.sale_balance for record in sale_records)
+        total_transactions = len(sale_records)
+
+        # Group payment methods (same logic as PDF generation)
+        payment_methods = {}
+        for record in sale_records:
+            method = record.payment_method or 'Cash'
+            if method not in payment_methods:
+                payment_methods[method] = {'count': 0, 'amount': 0}
+            payment_methods[method]['count'] += 1
+            payment_methods[method]['amount'] += record.sale_total
+
+        # Get recent transactions (last 20, same as PDF generation)
+        recent_transactions = []
+        for record in sale_records[:20]:
+            recent_transactions.append({
+                'uid': record.uid,
+                'clerk': record.sale_clerk,
+                'total': float(record.sale_total),
+                'paid': float(record.sale_paid_amount),
+                'method': record.payment_method or 'Cash',
+                'date': (record.created_at + timedelta(hours=3)).strftime('%m/%d %H:%M')
+            })
+
+        # Get shop data (same as PDF generation)
+        shop_data = load_shop_data()
+
+        # Return JSON data for direct thermal printing (UX upgrade)
+        response_data = {
+            'shop_name': shop_data['pos_shop_name'],
+            'shop_address': shop_data['shop_adress'],
+            'shop_phone': shop_data['pos_shop_call_number'],
+            'total_transactions': total_transactions,
+            'total_sales': float(total_sales),
+            'total_paid': float(total_paid),
+            'balance': float(total_balance),
+            'payment_methods': payment_methods,
+            'recent_transactions': recent_transactions,
+            'generated_date': datetime.now().strftime('%m/%d/%y %H:%M'),
+            'data_source': 'direct_api',  # Mark as direct data (not PDF conversion)
+            'thermal_layout': '58mm'
+        }
+
+        print(f"✅ [DIRECT-API] Sales report data prepared: {total_transactions} transactions, KES {total_sales} total")
+        return jsonify({"status": "success", "data": response_data})
+
+    except Exception as e:
+        print(f"❌ [DIRECT-API] Error fetching sales report data: {e}")
+        return jsonify({"status": "error", "message": "Failed to fetch sales report data"}), 500
+
+@app.route('/api/items_report_data', methods=['GET'])
+def get_items_report_data():
+    """Return items report data as JSON for direct thermal printing (UX upgrade)"""
+    try:
+        print("🔄 [DIRECT-API] Fetching items report data for thermal printing")
+
+        # Get all items with stock information (same logic as PDF generation)
+        items = SaleItem.query.all()
+        stock_data = {stock.item_uid: stock for stock in SaleItemStockCount.query.all()}
+
+        # Calculate sales data per item (same logic as PDF generation)
         sales_data = {}
         transactions = SaleItemTransaction.query.all()
         for transaction in transactions:
@@ -1193,7 +1486,7 @@ def get_items_report():
                 sales_data[uid] = 0
             sales_data[uid] += transaction.transaction_quantity
 
-        # Build items report
+        # Build items report (same logic as PDF generation)
         items_report = []
         total_value = 0
         total_items = 0
@@ -1220,251 +1513,51 @@ def get_items_report():
                 "item_value": float(item_value),
                 "units_sold": units_sold,
                 "item_type": item.item_type,
-                "low_stock": current_stock < restock_value
+                "low_stock": current_stock < restock_value,
+                "needs_restock": current_stock < restock_value
             })
 
-        # Sales summary by clerk
-        clerk_sales = {}
-        for record in SaleRecord.query.all():
-            clerk = record.sale_clerk
-            if clerk not in clerk_sales:
-                clerk_sales[clerk] = {"transactions": 0, "total_sales": 0.0}
-            clerk_sales[clerk]["transactions"] += 1
-            clerk_sales[clerk]["total_sales"] += record.sale_total
+        # Get restock items (same logic as PDF generation)
+        restock_items = [
+            {
+                'name': item['name'],
+                'current_stock': item['current_stock'],
+                'restock_level': item['restock_value']
+            }
+            for item in items_report if item['low_stock']
+        ]
 
-        try:
-            print("Loading shop data and user info...")
-            shop_data = load_shop_data()
-            print(f"Shop data loaded: {shop_data}")
+        # Get shop data (same as PDF generation)
+        shop_data = load_shop_data()
 
-            # Handle session gracefully for APK requests
-            try:
-                user_name = user_from_session()
-                print(f"User name: {user_name}")
-            except:
-                # Default user info for APK requests
-                user_name = {"user_name": "APK User"}
-                print("Using default APK user info")
+        # Return JSON data for direct thermal printing (UX upgrade)
+        response_data = {
+            'shop_name': shop_data['pos_shop_name'],
+            'shop_address': shop_data['shop_adress'],
+            'shop_phone': shop_data['pos_shop_call_number'],
+            'total_items': total_items,
+            'total_value': float(total_value),
+            'low_stock_count': low_stock_count,
+            'restock_count': len(restock_items),
+            'restock_items': restock_items,
+            'generated_date': datetime.now().strftime('%m/%d/%y %H:%M'),
+            'data_source': 'direct_api',  # Mark as direct data (not PDF conversion)
+            'thermal_layout': '58mm'
+        }
 
-            # Test ReportLab imports
-            print("Testing ReportLab imports...")
-            try:
-                from reportlab.lib.pagesizes import A4, landscape
-                from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-                from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
-                from reportlab.lib import colors
-                from reportlab.lib.units import inch
-                print("ReportLab imports successful")
-            except Exception as e:
-                print(f"ReportLab import error: {e}")
-                raise
-
-            # Create PDF buffer for landscape A4
-            pdf_buffer = BytesIO()
-
-            print("Creating SimpleDocTemplate...")
-            try:
-                doc = SimpleDocTemplate(pdf_buffer, pagesize=landscape(A4),
-                                       leftMargin=0.5*inch, rightMargin=0.5*inch,
-                                       topMargin=0.5*inch, bottomMargin=0.5*inch)
-                print("SimpleDocTemplate created successfully")
-            except Exception as e:
-                print(f"Error creating SimpleDocTemplate: {e}")
-                raise
-
-            print("Getting sample style sheet...")
-            try:
-                styles = getSampleStyleSheet()
-                print(f"Sample style sheet obtained: {type(styles)}")
-                print(f"Available styles: {list(styles.keys()) if hasattr(styles, 'keys') else 'Not a dict'}")
-            except Exception as e:
-                print(f"Error getting sample style sheet: {e}")
-                raise
-
-            # Custom styles for items report
-            print("Creating ReportLab styles...")
-            try:
-                # Check what styles are available in the StyleSheet1 object
-                print(f"Available styles in StyleSheet1: {list(styles.byName.keys())}")
-                
-                # Use the available styles from StyleSheet1
-                title_style = ParagraphStyle('Title', parent=styles['Title'], fontSize=16, alignment=1, spaceAfter=20)
-                subtitle_style = ParagraphStyle('Subtitle', parent=styles['Heading2'], fontSize=14, alignment=1, spaceAfter=15)
-                normal_style = ParagraphStyle('Normal', parent=styles['Normal'], fontSize=10, leading=12)
-                center_style = ParagraphStyle('Center', parent=styles['Normal'], fontSize=10, alignment=1, spaceAfter=10)
-                print("ReportLab styles created successfully")
-            except Exception as e:
-                print(f"Error creating ReportLab styles: {e}")
-                print(f"Available styles: {list(styles.byName.keys()) if hasattr(styles, 'byName') else 'No byName attribute'}")
-                raise
-
-            story = []
-
-            # Header
-            print("Creating PDF header...")
-            try:
-                story.append(Paragraph(shop_data['pos_shop_name'], title_style))
-                story.append(Paragraph(f"Address: {shop_data['shop_adress']} | Tel: {shop_data['pos_shop_call_number']}", center_style))
-                story.append(Paragraph("ITEMS INVENTORY REPORT", subtitle_style))
-                story.append(Paragraph(f"Generated by: {user_name['user_name']} | Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", center_style))
-                story.append(Spacer(1, 20))
-                print("PDF header created successfully")
-            except Exception as e:
-                print(f"Error creating PDF header: {e}")
-                raise
-
-            # Inventory Summary
-            story.append(Paragraph("INVENTORY SUMMARY", subtitle_style))
-
-            # Format numbers with commas and decimals
-            def format_currency(amount):
-                return f"KES {amount:,.2f}"
-
-            # Debug summary data
-            try:
-                total_sold = sum(item['units_sold'] for item in items_report)
-                print(f"Summary data: total_items={total_items}, total_value={total_value}, low_stock_count={low_stock_count}, total_sold={total_sold}")
-            except Exception as e:
-                print(f"Error calculating summary: {e}")
-                raise
-
-            # Summary table
-            summary_data = [
-                ['Total Items', 'Total Inventory Value', 'Low Stock Items', 'Items Sold Today'],
-                [str(total_items), format_currency(total_value), str(low_stock_count), str(sum(item['units_sold'] for item in items_report))]
-            ]
-
-            summary_table = Table(summary_data, colWidths=[2*inch, 2*inch, 2*inch, 2*inch])
-            summary_table.setStyle(TableStyle([
-                ('FONTSIZE', (0, 0), (-1, -1), 10),
-                ('FONTNAME', (0, 0), (-1, 0), 'Courier-Bold'),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('LEFTPADDING', (0, 0), (-1, -1), 5),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 5),
-                ('TOPPADDING', (0, 0), (-1, -1), 5),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-            ]))
-            story.append(summary_table)
-            story.append(Spacer(1, 15))
-
-            # Sales by clerk summary
-            if clerk_sales:
-                story.append(Paragraph("SALES SUMMARY BY CLERK", styles['Heading3']))
-                clerk_data = [['Clerk Name', 'Total Transactions', 'Total Sales Amount']]
-                for clerk, data in clerk_sales.items():
-                    clerk_data.append([clerk, str(data['transactions']), format_currency(data['total_sales'])])
-
-                clerk_table = Table(clerk_data, colWidths=[2.5*inch, 2*inch, 2*inch])
-                clerk_table.setStyle(TableStyle([
-                    ('FONTSIZE', (0, 0), (-1, -1), 9),
-                    ('FONTNAME', (0, 0), (-1, 0), 'Courier-Bold'),
-                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                    ('LEFTPADDING', (0, 0), (-1, -1), 3),
-                    ('RIGHTPADDING', (0, 0), (-1, -1), 3),
-                    ('TOPPADDING', (0, 0), (-1, -1), 3),
-                    ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-                ]))
-                story.append(clerk_table)
-                story.append(Spacer(1, 20))
-
-            # Page break before detailed items
-            story.append(PageBreak())
-
-            # Detailed Items
-            story.append(Paragraph("DETAILED ITEMS INVENTORY", subtitle_style))
-
-            # Items table header
-            items_data = [['Item Name', 'UPC Code', 'Current Stock', 'Restock Level', 'Unit Price', 'Inventory Value', 'Units Sold', 'Item Type']]
-
-            # Add items (limit to avoid huge PDF)
-            for item in items_report[:500]:  # Limit to 500 items to keep PDF manageable
-                try:
-                    row_data = [
-                        item['name'][:25] + '...' if len(item['name']) > 25 else item['name'],  # Truncate long names
-                        item['upc_code'],
-                        str(item['current_stock']),
-                        str(item['restock_value']),
-                        format_currency(item['price']),
-                        format_currency(item['item_value']),
-                        str(item['units_sold']),
-                        item['item_type']
-                    ]
-                    # Ensure all row data is valid (not None)
-                    row_data = [str(x) if x is not None else '' for x in row_data]
-                    items_data.append(row_data)
-                except (KeyError, TypeError) as e:
-                    print(f"Error processing item {item}: {e}")
-                    continue
-
-            # Ensure we have at least the header
-            if len(items_data) <= 1:
-                # No items, add empty row to prevent table creation error
-                items_data.append(['No items found', '', '', '', '', '', '', ''])
-
-            # Debug: Check data consistency
-            print(f"Items data length: {len(items_data)}")
-            if items_data:
-                header_len = len(items_data[0])
-                print(f"Header length: {header_len}")
-                for i, row in enumerate(items_data):
-                    if len(row) != header_len:
-                        print(f"Row {i} length mismatch: expected {header_len}, got {len(row)}")
-                        print(f"Row {i} content: {row}")
-
-            # Create table with multiple rows per page - ensure colWidths matches number of columns
-            expected_cols = len(items_data[0]) if items_data else 8
-            col_widths = [1.5*inch, 1.2*inch, 0.8*inch, 0.8*inch, 1*inch, 1.2*inch, 0.8*inch, 1*inch][:expected_cols]
-
-            print(f"Creating table with {len(items_data)} rows, {expected_cols} columns")
-            items_table = Table(items_data, colWidths=col_widths)
-            items_table.setStyle(TableStyle([
-                ('FONTSIZE', (0, 0), (-1, -1), 7),
-                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-                ('LEFTPADDING', (0, 0), (-1, -1), 2),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 2),
-                ('TOPPADDING', (0, 0), (-1, -1), 2),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-            ]))
-            story.append(items_table)
-
-            if len(items_report) > 500:
-                story.append(Spacer(1, 10))
-                story.append(Paragraph(f"* Showing first 500 of {len(items_report)} total items", center_style))
-
-            # Build PDF
-            doc.build(story)
-            pdf_buffer.seek(0)
-
-            print("Items inventory PDF generated successfully")
-
-            # Return as download that opens in print dialog
-            response = make_response(pdf_buffer.read())
-            response.headers['Content-Type'] = 'application/pdf'
-            response.headers['Content-Disposition'] = 'inline; filename=items_inventory_report.pdf'
-            return response
-
-        except Exception as e:
-            print(f"Error in PDF generation: {e}")
-            raise
+        print(f"✅ [DIRECT-API] Items report data prepared: {total_items} items, {low_stock_count} low stock, {len(restock_items)} need restock")
+        return jsonify({"status": "success", "data": response_data})
 
     except Exception as e:
-        print(f"Error generating items report: {e}")
-        return jsonify({"status": "error", "message": "Failed to generate items report"})
+        print(f"❌ [DIRECT-API] Error fetching items report data: {e}")
+        return jsonify({"status": "error", "message": "Failed to fetch items report data"}), 500
 
 @app.route('/get_sale_record_printout', methods=['GET'])
 def get_sale_record_printout():
+    """Generate thermal receipt format (58mm) for sales records"""
     # Allow access for APK interface without session authentication
-    # This endpoint is for APK data display, not web interface
 
-    # Get date parameters
+    # Get date parameters (for filtering, but thermal receipts are typically individual)
     start_date_str = request.args.get('start_date')
     end_date_str = request.args.get('end_date')
 
@@ -1475,10 +1568,8 @@ def get_sale_record_printout():
         try:
             start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
             end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
-            # Set end_date to end of day
             end_date = end_date.replace(hour=23, minute=59, second=59)
         except ValueError:
-            # Invalid date format, ignore filtering
             start_date = None
             end_date = None
 
@@ -1487,9 +1578,9 @@ def get_sale_record_printout():
         sale_records = SaleRecord.query.filter(
             SaleRecord.created_at >= start_date,
             SaleRecord.created_at <= end_date
-        ).order_by(SaleRecord.created_at.desc()).all()  # Latest first
+        ).order_by(SaleRecord.created_at.desc()).all()
     else:
-        sale_records = SaleRecord.query.order_by(SaleRecord.created_at.desc()).all()  # Latest first
+        sale_records = SaleRecord.query.order_by(SaleRecord.created_at.desc()).all()
 
     shop_data = load_shop_data()
 
@@ -1497,7 +1588,6 @@ def get_sale_record_printout():
     try:
         user_name = user_from_session()
     except:
-        # Default user info for APK requests
         user_name = {"user_name": "APK User"}
 
     # Check if request wants HTML for iframe display
@@ -1509,7 +1599,6 @@ def get_sale_record_printout():
             total_balance = sum(record.sale_balance for record in sale_records)
             total_transactions = len(sale_records)
 
-            # Payment method breakdown
             payment_methods = {}
             for record in sale_records:
                 method = record.payment_method or 'Cash'
@@ -1521,10 +1610,8 @@ def get_sale_record_printout():
             total_sales = total_paid = total_balance = total_transactions = 0
             payment_methods = {}
 
-        # Limit records for display (same as PDF limit)
         display_records = sale_records[:500] if sale_records else []
 
-        # Handle session variables gracefully for APK requests
         try:
             user_type = query['middleware']
         except:
@@ -1551,47 +1638,47 @@ def get_sale_record_printout():
         ))
         return response
 
-    # Generate PDF directly in landscape A4 format with fiscal summary
-    # (sale_records already fetched above with proper ordering)
-
-    shop_data = load_shop_data()
-
-    # Handle session gracefully for APK requests
-    try:
-        user_name = user_from_session()
-    except:
-        # Default user info for APK requests
-        user_name = {"user_name": "APK User"}
-
-    # Landscape A4 format
-    from reportlab.lib.pagesizes import A4, landscape
+    # Generate thermal receipt PDF (58mm width, portrait orientation)
+    from reportlab.lib.pagesizes import letter
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
     from reportlab.lib import colors
-    from reportlab.lib.units import inch
+    from reportlab.lib.units import mm
 
     pdf_buffer = BytesIO()
-    doc = SimpleDocTemplate(pdf_buffer, pagesize=landscape(A4),
-                           leftMargin=0.5*inch, rightMargin=0.5*inch,
-                           topMargin=0.5*inch, bottomMargin=0.5*inch)
+
+    # 58mm thermal receipt dimensions (portrait)
+    receipt_width = 48 * mm  # 48mm printable width (58mm paper - margins)
+    receipt_height = 297 * mm  # A4 height for long receipts
+
+    doc = SimpleDocTemplate(
+        pdf_buffer,
+        pagesize=(receipt_width, receipt_height),
+        leftMargin=2*mm,
+        rightMargin=2*mm,
+        topMargin=3*mm,
+        bottomMargin=3*mm
+    )
+
     styles = getSampleStyleSheet()
 
-    # Custom styles for fiscal report
-    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=16, alignment=1, spaceAfter=20)
-    subtitle_style = ParagraphStyle('Subtitle', parent=styles['Heading2'], fontSize=14, alignment=1, spaceAfter=15)
-    normal_style = ParagraphStyle('Normal', parent=styles['Normal'], fontSize=10, leading=12)
-    center_style = ParagraphStyle('Center', parent=styles['Normal'], fontSize=10, alignment=1, spaceAfter=10)
+    # Thermal receipt styles - compact and optimized for 58mm
+    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=10, alignment=1, spaceAfter=3, fontName='Courier-Bold')
+    normal_style = ParagraphStyle('Normal', parent=styles['Normal'], fontSize=7, leading=8, fontName='Courier')
+    center_style = ParagraphStyle('Center', parent=styles['Normal'], fontSize=7, alignment=1, spaceAfter=2, fontName='Courier')
+    item_style = ParagraphStyle('Item', parent=styles['Normal'], fontSize=6, leading=7, fontName='Courier')
 
     story = []
 
-    # Header
-    story.append(Paragraph(shop_data['pos_shop_name'], title_style))
-    story.append(Paragraph(f"Address: {shop_data['shop_adress']} | Tel: {shop_data['pos_shop_call_number']}", center_style))
-    story.append(Paragraph("SALES RECORDS REPORT", subtitle_style))
-    story.append(Paragraph(f"Generated by: {user_name['user_name']} | Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", center_style))
-    story.append(Spacer(1, 20))
+    # Header - compact for thermal receipt
+    story.append(Paragraph(shop_data['pos_shop_name'][:20], title_style))  # Truncate for narrow receipt
+    story.append(Paragraph(shop_data['shop_adress'][:25], center_style))
+    story.append(Paragraph(f"Tel: {shop_data['pos_shop_call_number']}", center_style))
+    story.append(Paragraph("=" * 25, center_style))  # Separator line
+    story.append(Paragraph("SALES SUMMARY", center_style))
+    story.append(Paragraph("=" * 25, center_style))
+    story.append(Spacer(1, 2*mm))
 
-    # Fiscal Summary Section
     if sale_records:
         # Calculate fiscal summary
         total_sales = sum(record.sale_total for record in sale_records)
@@ -1608,109 +1695,102 @@ def get_sale_record_printout():
             payment_methods[method]['count'] += 1
             payment_methods[method]['amount'] += record.sale_total
 
-        story.append(Paragraph("FISCAL SUMMARY", subtitle_style))
-
-        # Format numbers with commas and decimals
+        # Thermal receipt format - compact summary
         def format_currency(amount):
             return f"KES {amount:,.2f}"
 
-        # Summary table
-        summary_data = [
-            ['Total Transactions', 'Total Sales Amount', 'Total Amount Paid', 'Total Balance/Change'],
-            [str(total_transactions), format_currency(total_sales), format_currency(total_paid), format_currency(total_balance)]
-        ]
+        story.append(Paragraph(f"Total Transactions: {total_transactions}", normal_style))
+        story.append(Paragraph(f"Total Sales: {format_currency(total_sales)}", normal_style))
+        story.append(Paragraph(f"Total Paid: {format_currency(total_paid)}", normal_style))
+        story.append(Paragraph(f"Balance/Change: {format_currency(total_balance)}", normal_style))
+        story.append(Spacer(1, 2*mm))
 
-        summary_table = Table(summary_data, colWidths=[2*inch, 2*inch, 2*inch, 2*inch])
-        summary_table.setStyle(TableStyle([
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('FONTNAME', (0, 0), (-1, 0), 'Courier-Bold'),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('LEFTPADDING', (0, 0), (-1, -1), 5),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 5),
-            ('TOPPADDING', (0, 0), (-1, -1), 5),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ]))
-        story.append(summary_table)
-        story.append(Spacer(1, 15))
-
-        # Payment methods breakdown
+        # Payment methods breakdown (compact)
         if payment_methods:
-            story.append(Paragraph("PAYMENT METHODS BREAKDOWN", styles['Heading3']))
-            payment_data = [['Payment Method', 'Transaction Count', 'Total Amount']]
+            story.append(Paragraph("Payment Methods:", normal_style))
             for method, data in payment_methods.items():
-                payment_data.append([method, str(data['count']), format_currency(data['amount'])])
+                story.append(Paragraph(f"  {method}: {data['count']} txns", item_style))
+                story.append(Paragraph(f"    {format_currency(data['amount'])}", item_style))
+            story.append(Spacer(1, 2*mm))
 
-            payment_table = Table(payment_data, colWidths=[2.5*inch, 2*inch, 2*inch])
-            payment_table.setStyle(TableStyle([
-                ('FONTSIZE', (0, 0), (-1, -1), 9),
-                ('FONTNAME', (0, 0), (-1, 0), 'Courier-Bold'),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('LEFTPADDING', (0, 0), (-1, -1), 3),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 3),
-                ('TOPPADDING', (0, 0), (-1, -1), 3),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-            ]))
-            story.append(payment_table)
-            story.append(Spacer(1, 20))
+        story.append(Paragraph("-" * 30, center_style))
+        story.append(Paragraph("RECENT TRANSACTIONS", center_style))
+        story.append(Paragraph("-" * 30, center_style))
+        story.append(Spacer(1, 1*mm))
 
-        # Page break before detailed records
-        story.append(PageBreak())
+        # Recent transactions (last 20 for thermal receipt)
+        recent_records = sale_records[:20]  # Limit for thermal receipt
 
-        # Detailed Sales Records
-        story.append(Paragraph("DETAILED SALES RECORDS", subtitle_style))
+        for record in recent_records:
+            # Transaction details - very compact
+            story.append(Paragraph(f"ID: {record.uid[:8]}", item_style))
+            story.append(Paragraph(f"Clerk: {record.sale_clerk[:12]}", item_style))
+            story.append(Paragraph(f"Total: {format_currency(record.sale_total)}", item_style))
+            story.append(Paragraph(f"Paid: {format_currency(record.sale_paid_amount)}", item_style))
+            story.append(Paragraph(f"Method: {record.payment_method or 'Cash'}", item_style))
+            story.append(Paragraph(f"Date: {(record.created_at + timedelta(hours=3)).strftime('%m/%d %H:%M')}", item_style))
+            story.append(Paragraph("-" * 20, center_style))
+            story.append(Spacer(1, 1*mm))
 
-        # Records table header
-        records_data = [['Transaction ID', 'Clerk', 'Total', 'Paid', 'Change/Balance', 'Payment Method', 'Date/Time']]
+        # Generate thermal-optimized QR code and barcode
+        try:
+            receipt_code = f"SALES-{datetime.now().strftime('%H%M%S')}"
+            qr_data = f"Sales Summary\nTransactions: {total_transactions}\nTotal: {format_currency(total_sales)}\nCode: {receipt_code}"
 
-        # Add records (limit to avoid huge PDF)
-        for record in sale_records[:500]:  # Limit to 500 records to keep PDF manageable
-            records_data.append([
-                record.uid,
-                record.sale_clerk,
-                format_currency(record.sale_total),
-                format_currency(record.sale_paid_amount),
-                format_currency(record.sale_balance),
-                record.payment_method or 'Cash',
-                (record.created_at + timedelta(hours=3)).strftime('%Y-%m-%d %H:%M')
-            ])
+            # Generate QR code (smaller for thermal)
+            qr = qrcode.QRCode(version=1, box_size=3, border=1)
+            qr.add_data(qr_data)
+            qr.make(fit=True)
+            qr_img = qr.make_image(fill_color="black", back_color="white")
 
-        # Create table with multiple rows per page
-        records_table = Table(records_data, colWidths=[1.2*inch, 1.5*inch, 1*inch, 1*inch, 1.2*inch, 1.5*inch, 1.5*inch])
-        records_table.setStyle(TableStyle([
-            ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('FONTNAME', (0, 0), (-1, 0), 'Courier-Bold'),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-            ('LEFTPADDING', (0, 0), (-1, -1), 2),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 2),
-            ('TOPPADDING', (0, 0), (-1, -1), 2),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-        ]))
-        story.append(records_table)
+            # Generate barcode (compact)
+            barcode_img = generate_barcode_image(receipt_code)
 
-        if len(sale_records) > 500:
-            story.append(Spacer(1, 10))
-            story.append(Paragraph(f"* Showing first 500 of {len(sale_records)} total transactions", center_style))
+            if qr_img and barcode_img:
+                # Convert images for ReportLab
+                qr_buffer = BytesIO()
+                qr_img.save(qr_buffer, format='PNG')
+                qr_buffer.seek(0)
+                qr_rl_img = RLImage(qr_buffer)
+                qr_rl_img.drawWidth = 15 * mm
+                qr_rl_img.drawHeight = 15 * mm
+
+                barcode_buffer = BytesIO()
+                barcode_img.save(barcode_buffer, format='PNG')
+                barcode_buffer.seek(0)
+                barcode_rl_img = RLImage(barcode_buffer)
+                barcode_rl_img.drawWidth = 35 * mm
+                barcode_rl_img.drawHeight = 8 * mm
+
+                # Center both images
+                story.append(Spacer(1, 3*mm))
+                story.append(qr_rl_img)
+                story.append(Spacer(1, 2*mm))
+                story.append(barcode_rl_img)
+                story.append(Paragraph(receipt_code, center_style))
+
+        except Exception as e:
+            print(f"Thermal code generation failed: {e}")
+            story.append(Paragraph(f"Code: {receipt_code}", center_style))
 
     else:
         story.append(Paragraph("No sales records found", center_style))
 
-    # Build PDF
+    # Footer
+    story.append(Spacer(1, 3*mm))
+    story.append(Paragraph("Thank you for your business!", center_style))
+    story.append(Paragraph(f"Generated: {datetime.now().strftime('%m/%d/%y %H:%M')}", center_style))
+
+    # Build thermal receipt PDF
     doc.build(story)
     pdf_buffer.seek(0)
 
-    print("Sales records PDF generated successfully")
+    print("Thermal sales receipt PDF generated successfully (58mm)")
 
-    # Return as download that opens in print dialog
+    # Return as inline display for thermal printing
     response = make_response(pdf_buffer.read())
     response.headers['Content-Type'] = 'application/pdf'
-    response.headers['Content-Disposition'] = 'inline; filename=sales_records_report.pdf'
+    response.headers['Content-Disposition'] = 'inline; filename=thermal_sales_receipt.pdf'
     return response
     
 
@@ -2536,6 +2616,51 @@ def test_preview_simple():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
+@app.route('/get_sale_data/<int:sale_id>')
+def get_sale_data(sale_id):
+    """Get complete sale data for thermal printing"""
+    try:
+        # Get the sale record
+        sale_record = SaleRecord.query.filter_by(id=sale_id).first()
+        if not sale_record:
+            return jsonify({"status": "error", "message": "Sale record not found"}), 404
+
+        # Get sale items from transactions
+        transactions = SaleItemTransaction.query.filter_by(sale_id=sale_id).all()
+        items = []
+        for transaction in transactions:
+            item = SaleItem.query.filter_by(uid=transaction.item_uid).first()
+            if item:
+                items.append({
+                    'id': item.id,
+                    'uid': item.uid,
+                    'name': item.name,
+                    'quantity': transaction.transaction_quantity,
+                    'price': transaction.item_price,
+                    'total': transaction.transaction_quantity * transaction.item_price
+                })
+
+        # Return complete sale data
+        sale_data = {
+            'id': sale_record.id,
+            'uid': sale_record.uid,
+            'sale_clerk': sale_record.sale_clerk,
+            'sale_total': float(sale_record.sale_total),
+            'sale_paid_amount': float(sale_record.sale_paid_amount),
+            'sale_balance': float(sale_record.sale_balance),
+            'payment_method': sale_record.payment_method,
+            'payment_reference': sale_record.payment_reference,
+            'payment_gateway': sale_record.payment_gateway,
+            'created_at': sale_record.created_at.isoformat(),
+            'items': items
+        }
+
+        return jsonify({"status": "success", "sale_data": sale_data})
+
+    except Exception as e:
+        print(f"Error fetching sale data: {e}")
+        return jsonify({"status": "error", "message": "Internal server error"}), 500
 
 @app.route('/preview-sale-receipt')
 def preview_sale_receipt():
@@ -3938,15 +4063,15 @@ class SecureNetworkDiscoveryService:
                 self.session_expiry = now + timedelta(seconds=self.session_rotation_interval)
                 print(f"🔄 Generated new session key, expires at {self.session_expiry}")
             
-            # Create server info with fixed IP
+            # Create server info with actual server details (Flask runs on 8080, not discovery port)
             server_info = {
                 'server_type': 'blupos_backend',
-                'ip_address': '192.168.100.25',  # Fixed server IP
-                'port': self.port,
+                'ip_address': '192.168.0.102',  # Actual machine IP
+                'port': 8080,  # Flask app port, not discovery port
                 'server_name': 'BluPOS Backend Server',
                 'last_seen': now.isoformat(),
                 'timestamp': int(now.timestamp()),
-                'url': f'http://192.168.100.25:{self.port}'
+                'url': f'http://192.168.0.102:8080'  # Correct Flask URL
             }
             
             # Encrypt server info

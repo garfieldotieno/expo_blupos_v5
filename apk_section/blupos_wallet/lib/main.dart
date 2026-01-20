@@ -1,4 +1,4 @@
-import 'dart:async';
+                                                                                                                                                                                                                                                                                              import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
@@ -6,13 +6,14 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'pages/activation_page.dart';
+import 'pages/pdf_view_page.dart';
 import 'utils/api_client.dart';
 import 'services/micro_server_service.dart';
 import 'services/heartbeat_service.dart';
-
+import 'services/printer_service.dart';
 import 'services/sms_service.dart';
 import 'widgets/blinking_sms_icon.dart';
 import 'widgets/sms_indicator.dart';
@@ -50,25 +51,32 @@ class BluPOSWalletApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'BluPOS Wallet',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primaryColor: const Color(0xFF182A62),
-        scaffoldBackgroundColor: const Color(0xFFD7D7D7),
-        fontFamily: 'Poppins',
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF182A62),
-            foregroundColor: Colors.white,
-            minimumSize: const Size(double.infinity, 50),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<PrinterService>(
+          create: (_) => PrinterServiceFactory.create(),
+        ),
+      ],
+      child: MaterialApp(
+        title: 'BluPOS Wallet',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          primaryColor: const Color(0xFF182A62),
+          scaffoldBackgroundColor: const Color(0xFFD7D7D7),
+          fontFamily: 'Poppins',
+          elevatedButtonTheme: ElevatedButtonThemeData(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF182A62),
+              foregroundColor: Colors.white,
+              minimumSize: const Size(double.infinity, 50),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
           ),
         ),
+        home: const HomePage(),
       ),
-      home: const HomePage(),
     );
   }
 }
@@ -169,6 +177,18 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     }
 
     _loadAppState();
+    _autoConnectSavedPrinter();
+  }
+
+  Future<void> _autoConnectSavedPrinter() async {
+    try {
+      final printerService = Provider.of<PrinterService>(context, listen: false);
+      if (printerService is AndroidPrinterService) {
+        await printerService.autoConnectSavedPrinter();
+      }
+    } catch (e) {
+      debugPrint('Auto-connect failed: $e');
+    }
   }
 
   @override
@@ -826,6 +846,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
+  void _navigateToCheckout() {
+    // TODO: Implement checkout functionality
+    // For now, show a placeholder message
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Checkout - Coming Soon!')),
+    );
+  }
+
   void _navigateToReports() {
     // Trigger the transition animation
     setState(() {
@@ -915,8 +943,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     if (mounted) {
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (context) => PDFViewerScreen(
-            title: 'Sales Report',
+          builder: (context) => ItemsReportPdfView(
+            reportType: 'sales',
             pdfUrl: pdfUrl,
           ),
         ),
@@ -929,8 +957,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     if (mounted) {
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (context) => PDFViewerScreen(
-            title: 'Items Report',
+          builder: (context) => ItemsReportPdfView(
+            reportType: 'inventory',
             pdfUrl: pdfUrl,
           ),
         ),
@@ -1334,12 +1362,36 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           ),
         ),
 
-        // Sales and Items Buttons (2x2 grid)
+        // Menu Buttons: Checkout, Sales, Items, Share (full-width column layout)
         Container(
           margin: const EdgeInsets.only(bottom: 16),
           child: Column(
             children: [
-              // Row 1: Sales Button
+              // Checkout Button (NEW - full width)
+              Container(
+                width: double.infinity,
+                height: 50 * 1.35,
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ElevatedButton(
+                  onPressed: () => _navigateToCheckout(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF182A62),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'Checkout',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+
+              // Sales Button (full width)
               Container(
                 width: double.infinity,
                 height: 50 * 1.35,
@@ -1363,7 +1415,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 ),
               ),
 
-              // Row 2: Items Button
+              // Items Button (full width)
               Container(
                 width: double.infinity,
                 height: 50 * 1.35,
@@ -1386,36 +1438,36 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   ),
                 ),
               ),
-            ],
-          ),
-        ),
 
-        // Share Button (moved from main view to reports interface)
-        Container(
-          width: double.infinity,
-          height: 50 * 1.35,
-          margin: const EdgeInsets.only(bottom: 16),
-          child: ElevatedButton(
-            onPressed: () {
-              // TODO: Device sharing functionality
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Share - Device Sharing Coming Soon!')),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF182A62),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+              // Share Button (full width)
+              Container(
+                width: double.infinity,
+                height: 50 * 1.35,
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ElevatedButton(
+                  onPressed: () {
+                    // TODO: Device sharing functionality
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Share - Device Sharing Coming Soon!')),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF182A62),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'Share',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               ),
-            ),
-            child: const Text(
-              'Share',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            ],
           ),
         ),
 
@@ -1682,31 +1734,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
     }
   }
 
-  Future<void> _printPDF() async {
-    if (_localFilePath == null) return;
 
-    try {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('🖨️ Preparing PDF for printing...')),
-      );
-
-      // Use printing package to print the PDF
-      final file = File(_localFilePath!);
-      final bytes = await file.readAsBytes();
-
-      await Printing.layoutPdf(
-        onLayout: (format) async => bytes,
-      );
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('✅ PDF sent to printer')),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Print failed: $e')),
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1808,19 +1836,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                           ),
           ),
 
-          // Floating Print Button
-          if (!_isLoading && _error == null && _localFilePath != null)
-            Positioned(
-              bottom: 24,
-              right: 24,
-              child: FloatingActionButton(
-                onPressed: _printPDF,
-                backgroundColor: const Color(0xFF182A62),
-                foregroundColor: Colors.white,
-                child: const Icon(Icons.print),
-                tooltip: 'Print PDF',
-              ),
-            ),
+
         ],
       ),
     );
