@@ -121,6 +121,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   String _lastSyncResult = '';
   Timer? _smsSyncTimer;
 
+  // Menu summary data
+  Map<String, dynamic> _checkoutSummary = {};
+  Map<String, dynamic> _itemsSummary = {};
+  Map<String, dynamic> _salesSummary = {};
+  bool _checkoutSummaryLoading = false;
+  bool _itemsSummaryLoading = false;
+  bool _salesSummaryLoading = false;
+
   @override
   void initState() {
     super.initState();
@@ -797,6 +805,153 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     return [];
   }
 
+  Future<void> _loadCheckoutSummary() async {
+    if (!mounted) return;
+
+    print('🔄 Loading checkout summary data...');
+    setState(() {
+      _checkoutSummaryLoading = true;
+    });
+
+    try {
+      final summaryUrl = await _getBackendUrl('/api/checkout_summary');
+      final summaryResponse = await http.get(Uri.parse(summaryUrl));
+
+      if (summaryResponse.statusCode == 200) {
+        final summaryData = jsonDecode(summaryResponse.body);
+
+        if (summaryData['status'] == 'success' && summaryData['data'] != null) {
+          if (mounted) {
+            setState(() {
+              _checkoutSummary = summaryData['data'];
+              _checkoutSummaryLoading = false;
+            });
+          }
+          print('✅ Checkout summary loaded: ${_checkoutSummary.length} metrics');
+        } else {
+          print('❌ Checkout summary API returned error: ${summaryData['message']}');
+          if (mounted) {
+            setState(() {
+              _checkoutSummaryLoading = false;
+            });
+          }
+        }
+      } else {
+        print('❌ Checkout summary API failed with status: ${summaryResponse.statusCode}');
+        if (mounted) {
+          setState(() {
+            _checkoutSummaryLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      print('❌ Error fetching checkout summary: $e');
+      if (mounted) {
+        setState(() {
+          _checkoutSummaryLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadItemsSummary() async {
+    if (!mounted) return;
+
+    print('🔄 Loading items summary data...');
+    setState(() {
+      _itemsSummaryLoading = true;
+    });
+
+    try {
+      final summaryUrl = await _getBackendUrl('/api/items_summary');
+      final summaryResponse = await http.get(Uri.parse(summaryUrl));
+
+      if (summaryResponse.statusCode == 200) {
+        final summaryData = jsonDecode(summaryResponse.body);
+
+        if (summaryData['status'] == 'success' && summaryData['data'] != null) {
+          if (mounted) {
+            setState(() {
+              _itemsSummary = summaryData['data'];
+              _itemsSummaryLoading = false;
+            });
+          }
+          print('✅ Items summary loaded: ${_itemsSummary.length} metrics');
+        } else {
+          print('❌ Items summary API returned error: ${summaryData['message']}');
+          if (mounted) {
+            setState(() {
+              _itemsSummaryLoading = false;
+            });
+          }
+        }
+      } else {
+        print('❌ Items summary API failed with status: ${summaryResponse.statusCode}');
+        if (mounted) {
+          setState(() {
+            _itemsSummaryLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      print('❌ Error fetching items summary: $e');
+      if (mounted) {
+        setState(() {
+          _itemsSummaryLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadSalesSummary() async {
+    if (!mounted) return;
+
+    print('🔄 Loading sales summary data...');
+    setState(() {
+      _salesSummaryLoading = true;
+    });
+
+    try {
+      final summaryUrl = await _getBackendUrl('/api/sales_report_data');
+      final summaryResponse = await http.get(Uri.parse(summaryUrl));
+
+      if (summaryResponse.statusCode == 200) {
+        final summaryData = jsonDecode(summaryResponse.body);
+
+        if (summaryData['status'] == 'success' && summaryData['data'] != null) {
+          if (mounted) {
+            setState(() {
+              _salesSummary = summaryData['data'];
+              _salesSummaryLoading = false;
+            });
+          }
+          print('✅ Sales summary loaded: ${_salesSummary.length} metrics');
+        } else {
+          print('❌ Sales summary API returned error: ${summaryData['message']}');
+          if (mounted) {
+            setState(() {
+              _salesSummaryLoading = false;
+            });
+          }
+        }
+      } else {
+        print('❌ Sales summary API failed with status: ${summaryResponse.statusCode}');
+        if (mounted) {
+          setState(() {
+            _salesSummaryLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      print('❌ Error fetching sales summary: $e');
+      if (mounted) {
+        setState(() {
+          _salesSummaryLoading = false;
+        });
+      }
+    }
+  }
+
   Future<Map<String, dynamic>?> _syncWithBluPOS() async {
     try {
       // Use configured backend URL for BluPOS sync
@@ -854,7 +1009,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
-  void _navigateToReports() {
+  void _navigateToReports() async {
+    // Load summary data for menu buttons
+    await _loadCheckoutSummary();
+    await _loadItemsSummary();
+    await _loadSalesSummary();
+
     // Trigger the transition animation
     setState(() {
       _showReportsView = true;
@@ -1334,8 +1494,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
-  // Build the reports view with Back, Sales, Items, and Share
+  // Build the reports view with Back, Checkout, Sales, Items, and About
   Widget _buildReportsView() {
+    // Define glass-like blue gradient colors
+    final glassBlueStart = const Color(0xFF182A62).withOpacity(0.9);
+    final glassBlueEnd = const Color(0xFF182A62).withOpacity(0.7);
+
     return Column(
       children: [
         // Back Button
@@ -1346,11 +1510,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           child: ElevatedButton(
             onPressed: _navigateToMainView,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF182A62),
+              backgroundColor: glassBlueStart,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
               ),
+              elevation: 4,
+              shadowColor: const Color(0xFF182A62).withOpacity(0.3),
             ),
             child: const Text(
               'Back',
@@ -1362,108 +1528,402 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           ),
         ),
 
-        // Menu Buttons: Checkout, Sales, Items, Share (full-width column layout)
+        // Menu Interface - Center labeled with data display
         Container(
           margin: const EdgeInsets.only(bottom: 16),
           child: Column(
             children: [
-              // Checkout Button (NEW - full width)
-              Container(
-                width: double.infinity,
-                height: 50 * 1.35,
-                margin: const EdgeInsets.only(bottom: 12),
-                child: ElevatedButton(
-                  onPressed: () => _navigateToCheckout(),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF182A62),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+              // Header
+              const Padding(
+                padding: EdgeInsets.only(bottom: 16),
+                child: Text(
+                  'Menu',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black87,
                   ),
-                  child: const Text(
-                    'Checkout',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+
+              // Checkout Button with data (same dimensions as pending payment cards)
+              GestureDetector(
+                onTap: () {}, // No navigation for checkout
+                child: Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [glassBlueStart, glassBlueEnd],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 2,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      // Top row: ID and Amount (same as pending payments)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'ID: CHK-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.white.withOpacity(0.8),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Text(
+                            'KES ${_formatCurrencyWithCommas(_checkoutSummary['total_sales'] ?? 0.0)}',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      // Center label (same as pending payment format)
+                      const Center(
+                        child: Text(
+                          'Checkout',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      // Bottom row: Transactions, Balance, and SUMMARY status in same row
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '${_checkoutSummary['total_transactions'] ?? 0} transactions',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.white.withOpacity(0.9),
+                            ),
+                          ),
+                          Text(
+                            'Bal: KES ${_formatCurrencyWithCommas(_checkoutSummary['total_balance'] ?? 0.0)}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.white.withOpacity(0.8),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          // SUMMARY status in same row
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'SUMMARY',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ),
 
-              // Sales Button (full width)
-              Container(
-                width: double.infinity,
-                height: 50 * 1.35,
-                margin: const EdgeInsets.only(bottom: 12),
-                child: ElevatedButton(
-                  onPressed: () => _viewSalesReport(),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF182A62),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+              // Sales Button with summary data (same source as PDF generation)
+              GestureDetector(
+                onTap: () => _viewSalesReport(),
+                child: Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [glassBlueStart, glassBlueEnd],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 2,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
                   ),
-                  child: const Text(
-                    'Sales',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  child: Column(
+                    children: [
+                      // Top row: ID and Amount (same as pending payments)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'ID: SALES-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.white.withOpacity(0.8),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Text(
+                            'KES ${_formatCurrencyWithCommas(_salesSummary['total_sales'] ?? 0.0)}',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      // Center label (same as pending payment format)
+                      const Center(
+                        child: Text(
+                          'Sales',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      // Bottom row: Transactions, Balance, and REPORT status in same row
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '${_salesSummary['total_transactions'] ?? 0} transactions',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.white.withOpacity(0.9),
+                            ),
+                          ),
+                          Text(
+                            'Bal: KES ${_formatCurrencyWithCommas(_salesSummary['balance'] ?? 0.0)}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.white.withOpacity(0.8),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          // REPORT status in same row
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'REPORT',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ),
 
-              // Items Button (full width)
-              Container(
-                width: double.infinity,
-                height: 50 * 1.35,
-                margin: const EdgeInsets.only(bottom: 12),
-                child: ElevatedButton(
-                  onPressed: () => _viewItemsReport(),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF182A62),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+              // Items Button with data (same dimensions as pending payment cards)
+              GestureDetector(
+                onTap: () => _viewItemsReport(),
+                child: Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [glassBlueStart, glassBlueEnd],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 2,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
                   ),
-                  child: const Text(
-                    'Items',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  child: Column(
+                    children: [
+                      // Top row: ID and Amount (same as pending payments)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'ID: INV-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.white.withOpacity(0.8),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Text(
+                            'KES ${_formatCurrencyWithCommas(_itemsSummary['total_value'] ?? 0.0)}',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      // Center label (same as pending payment format)
+                      const Center(
+                        child: Text(
+                          'Items',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      // Bottom row: Stock info, Restock, and INVENTORY status in same row
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '${_itemsSummary['total_items'] ?? 0} items • Low: ${_itemsSummary['low_stock_count'] ?? 0}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.white.withOpacity(0.9),
+                            ),
+                          ),
+                          Text(
+                            'Restock: ${_itemsSummary['restock_needed'] ?? 0}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.white.withOpacity(0.8),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          // INVENTORY status in same row
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'INVENTORY',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ),
 
-              // Share Button (full width)
-              Container(
-                width: double.infinity,
-                height: 50 * 1.35,
-                margin: const EdgeInsets.only(bottom: 12),
-                child: ElevatedButton(
-                  onPressed: () {
-                    // TODO: Device sharing functionality
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Share - Device Sharing Coming Soon!')),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF182A62),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+              // About Button (no data, plain)
+              GestureDetector(
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('BluPOS v1.0.0 - Point of Sale System')),
+                  );
+                },
+                child: Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [glassBlueStart, glassBlueEnd],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 2,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
                   ),
-                  child: const Text(
-                    'Share',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  child: const Column(
+                    children: [
+                      // Top row: ID and Amount placeholder
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'ID: ABOUT-INFO',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Text(
+                            'SYSTEM',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 6),
+                      // Center label
+                      Center(
+                        child: Text(
+                          'About',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 6),
+                      // Bottom row: BluPOS Information
+                      Center(
+                        child: Text(
+                          'BluPOS Information',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -1473,6 +1933,137 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
         const SizedBox(height: 16), // Bottom spacing
       ],
+    );
+  }
+
+  // Helper method to build clickable menu button
+  Widget _buildMenuButton(
+    String title,
+    String subtitle,
+    Color buttonColor,
+    VoidCallback onPressed, {
+    bool showSummary = false,
+    Map<String, dynamic> summaryData = const {},
+    bool isLoading = false,
+  }) {
+    return Container(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: buttonColor,
+          foregroundColor: Colors.white,
+          minimumSize: const Size(double.infinity, 60),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          elevation: 4,
+          shadowColor: const Color(0xFF182A62).withOpacity(0.3),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          child: Column(
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                  color: Colors.white.withOpacity(0.9),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Helper method to build corner data chip for grid layout
+  Widget _buildCornerDataChip(String label, String value, Color bgColor, Color textColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      constraints: const BoxConstraints(minWidth: 60),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: bgColor.withOpacity(0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 1,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w500,
+              color: textColor.withOpacity(0.9),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 1),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: textColor,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Helper method to build metric display for clockwise layout
+  Widget _buildMetricDisplay(String label, String value, Color bgColor, Color textColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: bgColor.withOpacity(0.5)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+              color: textColor.withOpacity(0.8),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: textColor,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
   }
 
@@ -1497,10 +2088,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             children: [
               const SizedBox(height: 20), // Conservative spacing from top
 
-              // Yellow Card (positioned near top)
+              // Yellow Card (positioned near top) - Reduced by 15% from 302px, active/expiry always at bottom
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(24.0),
+                height: 257, // Reduced by 15%: 302px * 0.85 = 256.7px, rounded to 257px
+                padding: const EdgeInsets.all(32.0), // Maintain padding for proper spacing
                 decoration: BoxDecoration(
                   color: const Color(0xFFFEC620),
                   borderRadius: BorderRadius.circular(16.0),
@@ -1537,28 +2129,36 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
 
-                    // Swinging SMS Indicator (always visible, swings between SMS count and sales)
-                    const Text(
-                      'Total Processed',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
+                    // Use flexible space to center the SMS indicator within the increased height
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Swinging SMS Indicator (always visible, swings between SMS count and sales)
+                          const Text(
+                            'Total Processed',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+
+                          // Add spacing between text and SMS indicator
+                          const SizedBox(height: 16),
+
+                          // SMS indicator - now properly centered in the available space
+                          SmsIndicator(
+                            unreadCountStream: _smsService.onUnreadCountChanged,
+                            senderType: _currentUnreadCount > 0 ? "Short Code" : "Unknown",
+                            totalSales: _totalSales,
+                            initialUnreadCount: _currentUnreadCount,
+                          ),
+                        ],
                       ),
                     ),
-                    SmsIndicator(
-                      unreadCountStream: _smsService.onUnreadCountChanged,
-                      senderType: _currentUnreadCount > 0 ? "Short Code" : "Unknown",
-                      totalSales: _totalSales,
-                      initialUnreadCount: _currentUnreadCount,
-                    ),
 
-
-
-                    const SizedBox(height: 16),
-
-                    // Bottom Row: License Status and Expiry (hide expiry for expired state)
+                    // Bottom Row: License Status and Expiry - positioned at actual bottom of card
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [

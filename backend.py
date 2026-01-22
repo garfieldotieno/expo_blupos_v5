@@ -69,6 +69,8 @@ CORS(app, resources={
     r"/get_total_sales": {"origins": "*"},
     r"/get_sale_record_printout": {"origins": "*"},
     r"/get_items_report": {"origins": "*"},
+    r"/api/checkout_summary": {"origins": "*"},
+    r"/api/items_summary": {"origins": "*"},
 })
 
 import os
@@ -1077,17 +1079,88 @@ def get_total_sales():
         # Calculate total sales: sum of all paid amounts minus sum of all balances/changes
         total_paid = db.session.query(db.func.sum(SaleRecord.sale_paid_amount)).scalar() or 0.0
         total_balance = db.session.query(db.func.sum(SaleRecord.sale_balance)).scalar() or 0.0
+        total_transactions = SaleRecord.query.count()
 
         # Net sales = total paid - total change/balance (what was actually kept by business)
         net_sales = total_paid - total_balance
 
         return jsonify({
             "status": "success",
-            "total_sales": "{:.2f}".format(net_sales)
+            "total_sales": "{:.2f}".format(net_sales),
+            "total_transactions": total_transactions,
+            "total_paid": "{:.2f}".format(total_paid),
+            "total_balance": "{:.2f}".format(total_balance)
         })
     except Exception as e:
         print(f"Error calculating total sales: {e}")
-        return jsonify({"status": "error", "total_sales": "0.00"})
+        return jsonify({"status": "error", "total_sales": "0.00", "total_transactions": 0, "total_paid": "0.00", "total_balance": "0.00"})
+
+@app.route('/api/checkout_summary', methods=['GET'])
+def get_checkout_summary():
+    """Get checkout summary data for menu interface display (clockwise fashion)"""
+    try:
+        # Calculate summary data from sales records
+        total_paid = db.session.query(db.func.sum(SaleRecord.sale_paid_amount)).scalar() or 0.0
+        total_balance = db.session.query(db.func.sum(SaleRecord.sale_balance)).scalar() or 0.0
+        total_transactions = SaleRecord.query.count()
+
+        # Net sales = total paid - total change/balance (what was actually kept by business)
+        net_sales = total_paid - total_balance
+
+        return jsonify({
+            "status": "success",
+            "data": {
+                "total_sales": float(net_sales),
+                "total_transactions": total_transactions,
+                "total_paid": float(total_paid),
+                "total_balance": float(total_balance)
+            }
+        })
+    except Exception as e:
+        print(f"Error fetching checkout summary: {e}")
+        return jsonify({"status": "error", "message": "Failed to fetch checkout summary"}), 500
+
+@app.route('/api/items_summary', methods=['GET'])
+def get_items_summary():
+    """Get items summary data for menu interface display (clockwise fashion)"""
+    try:
+        # Get all items with stock information
+        items = SaleItem.query.all()
+        stock_data = {stock.item_uid: stock for stock in SaleItemStockCount.query.all()}
+
+        # Calculate summary metrics
+        total_items = len(items)
+        total_value = 0
+        low_stock_count = 0
+        total_stock_quantity = 0
+        restock_needed = 0
+
+        for item in items:
+            stock = stock_data.get(item.uid)
+            current_stock = stock.current_stock_count if stock else 0
+            restock_value = stock.re_stock_value if stock else 0
+
+            total_value += current_stock * item.price
+            total_stock_quantity += current_stock
+
+            if current_stock < restock_value:
+                low_stock_count += 1
+                restock_needed += max(0, restock_value - current_stock)
+
+        # Select 4 vital metrics for clockwise display
+        return jsonify({
+            "status": "success",
+            "data": {
+                "total_items": total_items,
+                "total_value": float(total_value),
+                "low_stock_count": low_stock_count,
+                "total_stock_quantity": total_stock_quantity,
+                "restock_needed": restock_needed
+            }
+        })
+    except Exception as e:
+        print(f"Error fetching items summary: {e}")
+        return jsonify({"status": "error", "message": "Failed to fetch items summary"}), 500
 
 @app.route('/get_items_report', methods=['GET'])
 def get_items_report():
