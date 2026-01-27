@@ -9,14 +9,17 @@ import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'pages/activation_page.dart';
+import 'pages/about_page.dart';
 import 'pages/pdf_view_page.dart';
 import 'utils/api_client.dart';
 import 'services/micro_server_service.dart';
 import 'services/heartbeat_service.dart';
 import 'services/printer_service.dart';
 import 'services/sms_service.dart';
+import 'services/location_service.dart';
 import 'widgets/blinking_sms_icon.dart';
 import 'widgets/sms_indicator.dart';
+import 'widgets/location_button_group.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -105,6 +108,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   int _currentUnreadCount = 0;
   double _totalSales = 0.0;
 
+  // Location service
+  late final LocationService _locationService;
+  late StreamSubscription<bool> _locationStateSubscription;
+  bool _hasLocation = false;
+  String _locationAddress = 'Location Not Set';
+
 
 
   // Reactive payments data
@@ -184,6 +193,21 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       });
     }
 
+    // Initialize location service
+    print('📍 [LOCATION] Initializing location service...');
+    _locationService = LocationService();
+    _locationStateSubscription = _locationService.onLocationStateChanged.listen((hasLocation) {
+      print('📍 [LOCATION] Location state changed: hasLocation=$hasLocation');
+      if (mounted) {
+        setState(() {
+          _hasLocation = hasLocation;
+          _locationAddress = _locationService.address;
+          print('🎯 [LOCATION] UI state updated - _hasLocation: $_hasLocation, _locationAddress: $_locationAddress');
+        });
+      }
+    });
+    print('✅ [LOCATION] Location service initialized successfully');
+
     _loadAppState();
     _autoConnectSavedPrinter();
   }
@@ -203,6 +227,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   void dispose() {
     _smsArrivalSubscription.cancel();
     _unreadCountSubscription.cancel();
+    _locationStateSubscription.cancel();
     _paymentsRefreshTimer?.cancel();
     _smsSyncTimer?.cancel();
     super.dispose();
@@ -347,6 +372,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       }
     } catch (e) {
       print('❌ [APK] CLEARED payments refetch failed: $e');
+      if (mounted) {
+        setState(() {
+          _paymentsLoading = false;
+        });
+      }
+    } finally {
+      // 🚨 CRITICAL FIX: Ensure loading state is always reset
       if (mounted) {
         setState(() {
           _paymentsLoading = false;
@@ -574,6 +606,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       }
     } catch (e) {
       print('❌ [APK] PENDING payments refetch failed: $e');
+      if (mounted) {
+        setState(() {
+          _pendingPaymentsLoading = false;
+        });
+      }
+    } finally {
+      // 🚨 CRITICAL FIX: Ensure loading state is always reset
       if (mounted) {
         setState(() {
           _pendingPaymentsLoading = false;
@@ -1133,29 +1172,16 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   Widget _buildMainView() {
     return Column(
       children: [
-        // Reports Section - Single Button
-        Container(
-          width: double.infinity,
+        // Reports Section - Single Button with Location Button Group
+        LocationButtonGroup(
+          label: 'Menu',
+          onPressed: _navigateToReports,
+          onLocationPressed: () async {
+            // Request location access and update UI immediately
+            await _locationService.getCurrentLocation();
+          },
+          hasLocation: _hasLocation,
           height: 50 * 1.35,
-          margin: const EdgeInsets.only(bottom: 16),
-          child: ElevatedButton(
-            onPressed: _navigateToReports,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF182A62),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              elevation: _isSyncing ? 8 : 2,
-            ),
-            child: const Text(
-              'Menu',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
         ),
 
         // Combined Payments Section - Maintain ratio: 3:1, 2:2, 1:3, or 0:3 (pending:cleared)
@@ -1518,13 +1544,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               elevation: 4,
               shadowColor: const Color(0xFF182A62).withOpacity(0.3),
             ),
-            child: const Text(
-              'Back',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+                          child: Text(
+                            'Total Processed',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
           ),
         ),
 
@@ -1850,11 +1876,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 ),
               ),
 
-              // About Button (no data, plain)
+              // About Button - Navigate to Vertical Stack Interface
               GestureDetector(
                 onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('BluPOS v1.0.0 - Point of Sale System')),
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const AboutPage(),
+                    ),
                   );
                 },
                 child: Container(
@@ -2130,7 +2158,46 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       ],
                     ),
 
-                    // Use flexible space to center the SMS indicator within the increased height
+                    // Location Display Section (NEW: Shows location when available)
+                    if (_hasLocation)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8, bottom: 4),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.location_on,
+                              color: Colors.black87,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _locationAddress,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.black87,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8, bottom: 4),
+                        child: Text(
+                          'Location Not Set',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black54,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+
+                    // Use flexible space to center the SMS indicator within the remaining height
                     Expanded(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,

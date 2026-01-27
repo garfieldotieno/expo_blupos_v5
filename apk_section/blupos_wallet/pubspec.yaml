@@ -67,6 +67,18 @@ dependencies:
   flutter_blue_plus: ^1.32.8
   print_bluetooth_thermal: ^1.1.0
 
+  # Location Services
+  geolocator: ^11.0.0
+
+  # Local Video Player for tutorial videos
+  video_player: ^2.8.2
+
+  # URL Launcher for WhatsApp & Email integration
+  url_launcher: ^6.1.0
+
+  # Share functionality for video sharing
+  share_plus: ^7.0.0
+
   # Image processing for PDF to thermal bitmap conversion
   image: ^4.2.0
 
@@ -145,6 +157,7 @@ flutter:
   # App Icons Configuration
   assets:
     - assets/images/
+    - assets/videos/tutorial.mp4
 
 # App Icon Configuration
 flutter_launcher_icons:
