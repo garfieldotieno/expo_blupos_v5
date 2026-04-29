@@ -1,0 +1,142 @@
+{% extends 'side_nav_base.html' %}
+
+{% block content %}
+<div class="container" style="position: relative; margin:auto;">
+
+    <!-- slide shows using splider -->
+    <br>
+    <br>
+    <br>
+    <br>
+    <br>
+    <br>
+
+    <!-- end of slide shows -->
+  
+    <div class="after-container">
+        <p class="spacer" style="height: 5px;">
+
+        </p>
+        <form class="collapse" action="/verify" method="POST" id="scan_form">
+            <div class="row">
+                <div class="col-1">
+
+                </div>
+                <div class="col-10">
+                    <h3 class="text-center"><b>Enter User Details</b></h3>
+                    <br>
+                    
+                </div>
+                <div class="col-1">
+
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-3">
+
+                </div>
+                <div class="col-6">
+                    
+                    <h4 class="text-center" style="font-weight: 200;">Username</h4>
+                        <div class="form-group">
+                            <input type="text" class="form-control" placeholder="" id="user_name" name="user_name" required>
+                        </div>
+                    
+                </div>
+                <div class="col-3">
+
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-3">
+
+                </div>
+                <div class="col-6">
+                    <h4 class="text-center" style="font-weight: 200;">Password</h4>
+                        <div class="form-group">
+                            <input type="password" class="form-control" placeholder="" id="user_password" name="user_password" required>
+                        </div>
+                </div>
+                <div class="col-3">
+
+                </div>
+            </div>
+            <button class="form_product_type" type="submit">
+                <span class="form_upper_type_label">
+                    <h4 class="text-center" style="font-weight: bold; color:white">Submit</h4>
+                </span>
+            </button>
+            <br>
+            <br>
+        </form>
+        <div class="product_type" id="login" onclick="login_disappear()" data-toggle="collapse" data-target="#scan_form" aria-expanded="false" aria-controls="collapseExample" >
+            <div class="row">
+                <div class="col-8">
+                    <h4 class="type_label">Login</h4>
+
+                </div>
+                <div class="col-4">
+                    <span class="type_label">
+                        <i class="fa fa-sign-in"></i>
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div class="product_type" id="cancel" onclick="cancel_disappear()" style="display: none;" data-toggle="collapse" data-target="#scan_form" aria-expanded="false" aria-controls="collapseExample" >
+            <div class="row">
+                <div class="col-8">
+                    <h4 class="type_label">Cancel</h4>
+
+                </div>
+                <div class="col-4">
+                    <span class="type_label">
+                        <i class="fa fa-times-circle"></i>
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div class="product_type" onclick="switch_page('about')">
+            <div class="row">
+                <div class="col-8">
+                    <h4 class="type_label">About</h4>
+
+                </div>
+                <div class="col-4">
+                    <span class="type_label">
+                        <i class="fa fa-info-circle" style="font-weight: bolder;"></i>
+                    </span>
+                </div>
+            </div>
+        </div>
+        
+
+             
+        <p class="spacer" style="height: 15px;">
+
+        </p>
+
+
+
+    </div>
+
+    <br>
+    <br>
+
+   
+
+    <div class="stool">
+
+    </div>
+
+
+</div>
+
+
+
+
+
+
+{% endblock content %}
+
+
+

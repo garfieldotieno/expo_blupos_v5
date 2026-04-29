@@ -1,0 +1,99 @@
+{% extends 'side_nav_base.html' %}
+
+{% block content %}
+<br>
+<div class="container-fluid" style="position: relative; margin: auto;">
+ 
+        <div class="after-container4">
+            <p class="spacer" style="height: 2px;">
+                
+            </p>
+            <div class="product_type" onclick="switch_page('')">
+    
+                <span class="upper_type_label">
+                    <h4 class="text-center" style="font-weight: bolder;">
+                        Home
+                      <span class="icon"><i class="fa fa-home"></i></span>
+                      
+                    </h4>
+                  </span>
+            </div>
+            <p class="spacer" style="height: 8px;">
+                
+            </p>
+        </div>
+
+        <div class="sales-record-after-container4" id="user_listing_container">
+            <p class="spacer" style="height: 12px;">
+
+            </p>
+            <h3 class="text-center" id="license_key_header"><b> Sales</b></h3>
+            <br>
+                            
+            <div class="sales_info_pad">
+                <table style="width: 100%;" id="sales_record_table">
+                    <thead>
+                        <tr>
+                            <th>Transaction ID</th>
+                            <th>ID</th>
+                            <th>Clerk</th>
+                            <th>Total</th>
+                            <th>Amount</th>
+                            <th>Change</th>
+                            <th>Payment Method</th>
+                            <th>Payment Reference</th>
+                            <th>Payment Gateway</th>
+                            <th>Date Time</th>
+                        </tr>
+                    </thead>
+                    {% for sale in sales -%}
+                    <tr>
+                        <td>{{ sale.uid }}</td>
+                        <td>{{ sale.id }}</td>
+                        <td>{{ sale.sale_clerk }}</td>
+                        <td>{{ sale.sale_total }}</td>
+                        <td>{{ sale.sale_paid_amount }}</td>
+                        <td>{{ sale.sale_balance }}</td>
+                        <td>{{ sale.payment_method }}</td>
+                        <td>{{ sale.payment_reference }}</td>
+                        <td>{{ sale.payment_gateway }}</td>
+                        <td>{{ sale.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+                    </tr>
+                    {%- endfor %}
+                </table>
+            </div>
+            
+            <p class="spacer" style="height: 2px;">
+                
+            </p>
+            <div class="product_type" onclick="start_pdf_export('')">
+    
+                <span class="upper_type_label">
+                    <h4 class="text-center" style="font-weight: bolder;">
+                        Export
+                      <span class="icon"><i class="fa fa-download"></i></span>
+                      
+                    </h4>
+                  </span>
+            </div>
+            <p class="spacer" style="height: 8px;">
+                
+            </p>
+        </div>
+
+
+        <div class="after-container4">
+            
+        </div>
+
+</div>
+<div class="footer" style="height: 60px;">
+    <p>
+    </p>
+</div>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+         var dataTable = new DataTable('#sales_record_table');
+       });
+   </script>
+{% endblock content %}

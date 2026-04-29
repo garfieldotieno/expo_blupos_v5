@@ -1,0 +1,726 @@
+=== Backend started at 2026-04-29 17:59:46.567941 ===
+2026-04-29 17:59:47,991 - backend_sms_service - INFO - Database tables initialized successfully
+
+2026-04-29 17:59:48,779 - backend_sms_service - INFO - Database tables initialized successfully
+
+Log initialized - Bypass migration mode
+
+
+Frozen: True
+
+
+Base dir: C:\Users\Comp2\Downloads\expo_blupos_v5-main\expo_blupos_v5-main\expo_blupos_v5-main
+
+
+DB path: C:\Users\Comp2\Downloads\expo_blupos_v5-main\expo_blupos_v5-main\expo_blupos_v5-main\instance\pos_test.db
+
+
+Heavy imports successful.
+
+
+
+Importing backend with migration bypass...
+
+
+✅ Database configured with WAL mode
+
+
+🔄 Checking database tables...
+
+
+✅ Database tables already exist - skipping creation
+
+
+📊 License table columns: ['id', 'uid', 'license_key', 'license_type', 'license_status', 'license_expiry', 'created_at', 'updated_at', 'device_id', 'account_id']
+
+
+🔧 Database tables created/verified
+
+
+✅ Single account rule verified
+
+
+Backend imported successfully.
+
+
+Applied safe DB URI: sqlite:///C:/Users/Comp2/Downloads/expo_blupos_v5-main/expo_blupos_v5-main/expo_blupos_v5-main/instance/pos_test.db
+
+
+Database tables created successfully.
+
+
+
+All startup steps completed!
+
+
+Starting Flask server on http://0.0.0.0:8080 ...
+
+
+b''
+b" * Serving Flask app 'backend'\r\n"
+b' * Debug mode: off\r\n'
+2026-04-29 17:59:49,505 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8080
+ * Running on http://192.168.100.5:8080
+
+2026-04-29 17:59:49,505 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+
+2026-04-29 18:00:34,574 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:00:34] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:00:34,649 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:00:34] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:00:34,834 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:00:34] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:00:34,966 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:00:34] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:00:46,597 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:00:46] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:00:46,625 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:00:46] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:00:58,825 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:00:58] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:00:59,115 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:00:59] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:00:59,147 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:00:59] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:00:59,471 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:00:59] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:01:00,980 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:00] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:01:01,007 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:01] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:01,323 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:01] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:01:01,647 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:01] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:01:02,007 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:02] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:02,074 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:02] "GET /users HTTP/1.1" 200 -
+
+2026-04-29 18:01:02,549 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:02] "GET /static/css/main.css HTTP/1.1" 200 -
+
+2026-04-29 18:01:02,600 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:02] "GET /static/splide-3.1.2/dist/css/splide.min.css HTTP/1.1" 200 -
+
+2026-04-29 18:01:02,601 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:02] "GET /static/node_modules/bootstrap/dist/js/bootstrap.bundle.js HTTP/1.1" 200 -
+
+2026-04-29 18:01:02,604 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:02] "GET /static/DataTables/DataTables-1.13.6/css/dataTables.bootstrap5.min.css HTTP/1.1" 200 -
+
+2026-04-29 18:01:02,607 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:02] "GET /static/node_modules/font-awesome/css/font-awesome.css HTTP/1.1" 200 -
+
+2026-04-29 18:01:02,611 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:02] "GET /static/node_modules/bootstrap/dist/css/bootstrap.min.css HTTP/1.1" 200 -
+
+2026-04-29 18:01:02,875 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:02] "GET /static/node_modules/font-awesome/fonts/fontawesome-webfont.woff2?v=4.7.0 HTTP/1.1" 200 -
+
+2026-04-29 18:01:02,920 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:02] "GET /static/DataTables/DataTables-1.13.6/js/jquery.dataTables.min.js HTTP/1.1" 200 -
+
+2026-04-29 18:01:02,942 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:02] "GET /static/js/main.js HTTP/1.1" 200 -
+
+2026-04-29 18:01:02,942 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:02] "GET /static/DataTables/DataTables-1.13.6/js/dataTables.bootstrap5.min.js HTTP/1.1" 200 -
+
+2026-04-29 18:01:02,947 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:02] "GET /static/js/JsBarcode.all.min.js HTTP/1.1" 200 -
+
+2026-04-29 18:01:02,968 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:02] "GET /static/js/qrcode_dev/qrcode.min.js HTTP/1.1" 200 -
+
+2026-04-29 18:01:03,224 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:03] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:03,314 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:03] "GET /apk_connection_status?device_id=unknown HTTP/1.1" 200 -
+
+2026-04-29 18:01:03,317 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:03] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:01:03,541 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:03] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:01:03,634 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:03] "GET /static/assets/home_bg-min.png HTTP/1.1" 200 -
+
+2026-04-29 18:01:05,341 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:05] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:05,570 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:05] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:01:05,661 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:05] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:01:07,022 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:07] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:07,347 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:07] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:01:07,623 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:07] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:01:08,252 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:08] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:01:09,595 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:09] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:09,838 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:09] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:01:09,916 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:09] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:01:10,438 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:10] "GET /sales HTTP/1.1" 200 -
+
+2026-04-29 18:01:10,839 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:10] "GET /static/node_modules/print-js/dist/print.js HTTP/1.1" 200 -
+
+2026-04-29 18:01:10,856 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:10] "GET /static/node_modules/bootstrap/dist/css/bootstrap.min.css HTTP/1.1" 200 -
+
+2026-04-29 18:01:10,891 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:10] "GET /static/DataTables/DataTables-1.13.6/css/dataTables.bootstrap5.min.css HTTP/1.1" 200 -
+
+2026-04-29 18:01:10,908 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:10] "GET /static/node_modules/font-awesome/css/font-awesome.css HTTP/1.1" 200 -
+
+2026-04-29 18:01:10,926 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:10] "GET /static/css/main.css HTTP/1.1" 200 -
+
+2026-04-29 18:01:10,944 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:10] "GET /static/splide-3.1.2/dist/css/splide.min.css HTTP/1.1" 200 -
+
+2026-04-29 18:01:11,171 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:11] "GET /static/node_modules/font-awesome/fonts/fontawesome-webfont.woff2?v=4.7.0 HTTP/1.1" 200 -
+
+2026-04-29 18:01:11,196 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:11] "GET /static/assets/home_bg-min.png HTTP/1.1" 200 -
+
+2026-04-29 18:01:11,223 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:11] "GET /static/assets/logo_print.svg HTTP/1.1" 200 -
+
+2026-04-29 18:01:11,254 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:11] "GET /static/js/main.js HTTP/1.1" 200 -
+
+2026-04-29 18:01:11,282 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:11] "GET /static/DataTables/DataTables-1.13.6/js/jquery.dataTables.min.js HTTP/1.1" 200 -
+
+2026-04-29 18:01:11,349 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:11] "GET /static/node_modules/bootstrap/dist/js/bootstrap.bundle.js HTTP/1.1" 200 -
+
+2026-04-29 18:01:11,419 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:11] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:11,517 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:11] "GET /static/DataTables/DataTables-1.13.6/js/dataTables.bootstrap5.min.js HTTP/1.1" 200 -
+
+2026-04-29 18:01:11,574 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:11] "GET /static/js/JsBarcode.all.min.js HTTP/1.1" 200 -
+
+2026-04-29 18:01:11,633 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:11] "GET /static/js/qrcode_dev/qrcode.min.js HTTP/1.1" 200 -
+
+2026-04-29 18:01:11,650 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:11] "[33mGET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1[0m" 404 -
+
+2026-04-29 18:01:11,729 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:11] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:01:11,758 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:11] "GET /static/node_modules/bootstrap/dist/css/bootstrap.min.css.map HTTP/1.1" 200 -
+
+2026-04-29 18:01:11,994 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:11] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:01:12,272 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:12] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:12,287 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:12] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:13,288 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:13] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:13,568 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:13] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:01:13,616 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:13] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:01:13,936 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:13] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:01:15,284 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:15] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:15,610 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:15] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:01:15,854 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:15] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:01:17,279 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:17] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:17,605 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:17] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:01:17,850 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:17] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:01:18,251 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:18] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:01:19,588 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:19] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:19,817 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:19] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:01:19,910 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:19] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:01:21,329 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:21] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:21,646 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:21] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:01:21,906 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:21] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:01:23,296 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:23] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:23,557 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:23] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:01:23,605 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:23] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:01:23,915 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:23] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:01:25,275 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:25] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:25,592 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:25] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:01:25,851 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:25] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:01:27,300 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:27] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:27,621 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:27] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:01:27,880 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:27] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:01:28,250 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:28] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:01:29,602 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:29] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:29,822 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:29] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:01:29,914 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:29] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:01:31,279 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:31] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:31,606 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:31] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:01:31,850 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:31] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:01:33,296 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:33] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:33,561 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:33] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:01:33,610 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:33] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:01:33,930 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:33] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:01:35,287 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:35] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:35,601 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:35] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:01:35,860 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:35] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:01:37,287 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:37] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:37,600 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:37] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:01:37,860 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:37] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:01:38,261 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:38] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:01:39,586 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:39] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:39,828 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:39] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:01:39,902 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:39] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:01:41,287 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:41] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:41,600 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:41] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:01:41,857 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:41] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:01:43,304 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:43] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:43,565 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:43] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:01:43,628 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:43] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:01:43,950 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:43] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:01:45,277 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:45] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:45,593 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:45] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:01:45,851 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:45] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:01:47,286 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:47] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:47,609 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:47] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:01:47,854 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:47] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:01:48,256 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:48] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:01:49,613 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:49] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:49,834 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:49] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:01:49,924 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:49] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:01:51,311 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:51] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:51,627 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:51] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:01:51,886 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:51] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:01:53,278 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:53] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:53,561 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:53] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:01:53,592 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:53] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:01:53,914 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:53] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:01:55,294 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:55] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:55,619 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:55] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:01:55,866 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:55] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:01:57,276 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:57] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:57,588 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:57] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:01:57,847 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:57] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:01:58,250 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:58] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:01:59,593 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:59] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:01:59,832 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:59] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:01:59,906 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:01:59] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:02:01,273 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:01] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:01,595 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:01] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:02:01,856 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:01] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:02:03,290 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:03] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:03,560 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:03] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:02:03,607 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:03] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:02:03,928 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:03] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:02:05,265 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:05] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:05,587 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:05] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:02:05,849 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:05] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:02:07,290 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:07] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:07,602 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:07] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:02:07,865 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:07] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:02:08,517 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:08] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:02:09,369 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:09] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:09,567 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:09] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:02:09,687 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:09] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:02:11,035 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:11] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:11,356 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:11] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:02:11,621 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:11] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:02:11,922 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:11] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:12,269 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:12] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:13,091 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:13] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:13,306 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:13] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:02:13,401 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:13] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:02:13,711 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:13] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:02:15,019 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:15] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:15,339 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:15] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:02:15,602 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:15] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:02:17,035 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:17] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:17,356 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:17] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:02:17,618 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:17] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:02:18,012 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:18] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:02:19,332 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:19] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:19,567 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:19] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:02:19,690 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:19] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:02:21,265 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:21] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:21,578 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:21] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:02:21,836 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:21] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:02:23,281 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:23] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:23,564 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:23] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:02:23,596 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:23] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:02:23,920 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:23] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:02:25,020 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:25] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:25,347 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:25] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:02:25,614 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:25] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:02:27,023 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:27] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:27,346 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:27] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:02:27,614 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:27] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:02:28,260 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:28] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:02:29,581 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:29] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:29,813 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:29] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:02:29,892 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:29] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:02:31,576 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:31] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:31,999 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:31] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:02:32,263 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:32] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:02:33,282 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:33] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:33,565 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:33] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:02:33,599 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:33] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:02:33,919 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:33] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:02:35,278 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:35] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:35,597 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:35] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:02:35,857 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:35] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:02:37,267 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:37] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:37,581 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:37] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:02:37,845 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:37] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:02:38,265 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:38] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:02:39,580 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:39] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:39,830 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:39] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:02:39,888 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:39] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:02:41,271 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:41] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:41,589 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:41] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:02:41,851 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:41] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:02:43,280 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:43] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:43,569 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:43] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:02:43,601 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:43] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:02:43,912 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:43] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:02:45,272 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:45] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:45,602 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:45] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:02:45,848 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:45] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:02:47,276 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:47] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:47,599 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:47] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:02:47,848 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:47] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:02:48,249 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:48] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:02:49,597 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:49] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:49,835 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:49] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:02:49,908 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:49] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:02:51,276 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:51] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:51,587 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:51] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:02:51,851 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:51] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:02:53,296 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:53] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:53,569 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:53] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:02:53,616 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:53] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:02:53,929 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:53] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:02:55,272 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:55] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:55,594 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:55] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:02:55,855 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:55] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:02:57,282 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:57] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:57,600 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:57] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:02:57,864 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:57] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:02:58,253 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:58] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:02:59,601 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:59] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:02:59,837 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:59] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:02:59,914 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:02:59] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:03:01,277 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:01] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:03:01,592 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:01] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:03:01,856 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:01] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:03:03,285 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:03] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:03:03,574 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:03] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:03:03,606 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:03] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:03:03,933 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:03] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:03:05,273 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:05] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:03:05,598 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:05] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:03:05,858 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:05] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:03:07,277 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:07] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:03:07,622 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:07] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:03:07,850 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:07] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:03:08,256 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:08] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:03:09,594 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:09] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:03:09,831 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:09] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:03:09,919 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:09] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:03:11,278 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:11] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:03:11,595 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:11] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:03:11,854 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:11] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:03:12,591 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:12] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:03:12,616 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:12] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:03:13,284 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:13] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:03:13,561 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:13] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:03:13,608 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:13] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:03:13,932 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:13] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:03:15,273 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:15] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:03:15,596 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:15] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:03:15,856 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:15] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:03:17,276 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:17] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:03:17,597 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:17] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:03:17,857 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:17] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:03:18,262 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:18] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:03:19,572 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:19] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:03:19,823 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:19] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:03:21,224 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:21] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:03:21,592 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:21] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:03:21,821 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:21] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:03:21,915 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:21] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:03:23,289 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:23] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:03:23,564 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:23] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:03:23,612 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:23] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:03:23,922 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:23] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:03:25,332 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:25] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:03:25,649 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:25] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:03:25,916 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:25] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:03:27,274 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:27] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:03:27,595 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:27] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:03:27,861 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:27] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:03:34,307 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:34] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:03:34,566 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:34] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:03:34,630 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:34] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:03:34,952 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:03:34] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:04:12,282 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:04:12] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:04:12,578 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:04:12] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:04:34,306 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:04:34] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:04:34,562 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:04:34] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:04:34,624 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:04:34] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:04:34,947 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:04:34] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:05:12,584 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:05:12] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:05:12,620 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:05:12] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:05:34,286 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:05:34] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:05:34,560 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:05:34] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:05:34,608 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:05:34] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:05:34,930 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:05:34] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:06:12,301 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:06:12] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:06:12,582 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:06:12] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:06:34,356 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:06:34] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:06:34,559 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:06:34] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:06:34,669 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:06:34] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:06:34,981 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:06:34] "GET /get_latest_payments HTTP/1.1" 200 -
+
+2026-04-29 18:07:12,665 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:07:12] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:07:12,748 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:07:12] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:07:34,562 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:07:34] "GET /apk_connection_status?device_id=account_1771178850537 HTTP/1.1" 200 -
+
+2026-04-29 18:07:34,945 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:07:34] "POST /activate HTTP/1.1" 200 -
+
+2026-04-29 18:07:35,265 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:07:35] "GET /get_total_sales HTTP/1.1" 200 -
+
+2026-04-29 18:07:35,529 - werkzeug - INFO - 127.0.0.1 - - [29/Apr/2026 18:07:35] "GET /get_latest_payments HTTP/1.1" 200 -
+

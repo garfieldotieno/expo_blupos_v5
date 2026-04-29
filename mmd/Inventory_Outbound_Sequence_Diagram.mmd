@@ -1,0 +1,54 @@
+sequenceDiagram
+    participant U as User
+    participant F as Frontend (Web UI)
+    participant B as Backend API (Flask)
+    participant DB as Database (SQLite)
+    participant M as Microserver (Flutter)
+
+    Note over U,M: Inventory Outbound Operation - Stock Reduction During Item Sale
+
+    %% Step 1: Sale Initiation
+    U->>F: Select items on sales screen
+    F->>B: POST /add_sale_record (create sale record)
+
+    %% Step 2: Stock Validation
+    B->>DB: SELECT item stock check (SaleItem, SaleItemStockCount)
+    DB-->>B: Return stock quantity
+
+    alt Insufficient Stock
+        B-->>F: Response: Insufficient stock error
+        F-->>U: Display error message
+    else Sufficient Stock
+        B->>DB: INSERT sale record (SaleRecord)
+        B->>DB: INSERT item transaction (SaleItemTransaction)
+        B->>DB: UPDATE decrease stock quantity (SaleItemStockCount.current_stock_count -= 1)
+
+        %% Step 3: Stock Status Update
+        B->>DB: UPDATE stock status (check re_stock_status)
+
+        %% Step 4: Response Return
+        DB-->>B: Update successful
+        B-->>F: Response: Sale successful (sale_record, uid)
+        F-->>U: Display sale completion message
+
+        %% Step 5: Optional - Microserver Sync
+        B->>M: Inventory data sync request (optional)
+        M->>DB: SELECT updated inventory data
+        DB-->>M: Return inventory data
+        M->>M: Update local database (microserver_inventory.db)
+
+        %% Step 6: Real-time UI Update
+        F->>B: GET /api/inventory/items (inventory list update request)
+        B->>DB: SELECT current inventory status
+        DB-->>B: Return inventory data
+        B-->>F: Inventory data (JSON)
+        F-->>U: Update UI inventory display
+    end
+
+    %% Exception Handling
+    Note over B,DB: Rollback processing on exceptions
+    B->>DB: ROLLBACK (on error occurrence)
+    B-->>F: Error response
+
+    %% Audit Logging
+    Note over B: All inventory changes are logged

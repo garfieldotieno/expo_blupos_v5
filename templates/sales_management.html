@@ -1,0 +1,450 @@
+{% extends 'side_nav_base.html' %}
+
+{% block content %}
+<br>
+<div class="contaiiner" style="position: relative; margin: auto;">
+    <div class="middle_container" id="sale_container">
+        
+        <div class="row">
+            <div class="col-6">
+                <div class="after-container4" id="sale_flash_message_container" style="display: none;">
+                    <p class="spacer" style="height: 12px;">
+        
+                    </p>
+                    <div class="info_pad" >
+                        <div class="row">
+                            <div class="col-11">
+                                <p class="text-center" id="message_board">Flash message</p>
+                            </div>
+                            <div class="col-1">
+                                <span class="" onclick="destroy_flash()">
+                                    <i class="fa fa-times-circle" style="font-weight: bolder;"></i>
+                                </span>
+                            </div>
+                        </div>
+                        
+                    </div>
+                    <p class="spacer" style="height: 18px;">
+        
+                    </p>
+                </div>
+                <div class="after-container4">
+                    <p class="spacer" style="height: 12px;">
+        
+                    </p>
+                    <div class="info_pad" id="auto_sale">
+                        <div class="container" >
+                            <h3 class="text-center"><b>Auto Sale</b></h3>
+                                    <br> 
+                                    
+                                    <br>
+                                    <label for=""> Code</label>
+
+                                    <input type="text"  id="code_input" onchange="upload_item_code()" autofocus>
+
+                        </div>
+                        
+                    </div>
+                    <div class="info_pad" id="manual_sale" style="display: none;">
+                        <div class="container" >
+                            <h3 class="text-center"><b>Manual Sale</b></h3>
+                                    <br> 
+                                    
+                                    <br>
+                                    <label for=""> Code</label>
+                                    <input type="text"  id="code_input2" autofocus>
+
+                                    <button class="form_product_type" type="submit" onclick="upload_item_code2()">
+                                        <span class="form_upper_type_label">
+                                            <h4 class="text-center" style="font-weight: bold; color:white">Submit</h4>
+                                        </span>
+                                    </button>
+
+                        </div>
+                    </div>
+                    <div class="product_type" id="switch_btn" onclick="switch_input_mode()">
+                        <span class="upper_type_label">
+                            <h4 class="text-center" style="font-weight: bolder;">Manual</h4>
+                        </span>
+                    </div>
+                    <p class="spacer" style="height: 18px;">
+            
+                    </p>
+                </div>  
+            </div>
+            <div class="col-6">
+                <div class="after-container4" id="item_listing_container">
+                    <p class="spacer" style="height: 12px;">
+        
+                    </p>
+                    <div class="info_pad">
+                        <h2 class="text-center" style=" font-weight: 600;" id="totals_heading"></h2>
+                        <table style="width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th>Id</th>
+                                    <th>Name</th>
+                                    <th>Price</th>
+                                    <th>Action</th>
+                                </tr>
+                                
+                            </thead>
+                            <tbody id="tbody">
+                                
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="spacer" style="height: 18px;">
+        
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="after-container4" id="checkout_section" >
+            <p class="spacer" style="height: 2px;">
+                
+            </p>
+            <div class="product_type" onclick="switch_to_checkout()">
+                <span class="upper_type_label">
+                    <h4 class="text-center" style="font-weight: bolder;">Checkout</h4>
+                </span>
+            </div>
+            <p class="spacer" style="height: 8px;">
+                
+            </p>
+        </div>
+
+    </div>
+    <div class="middle_container" id="checkout_container" style="display: none;">
+        <div class="after-container4" id="back_button_container">
+            <p class="spacer" style="height: 2px;">
+
+            </p>
+            <div class="product_type" onclick="switch_back_from_checkout()" id="backout_btn">
+                <span class="upper_type_label">
+                    <h4 class="text-center" style="font-weight: bolder;">Back</h4>
+                </span>
+            </div>
+            <p class="spacer" style="height: 8px;">
+
+            </p>
+        </div>
+        <div class="after-container4" id="post_checkout_print_button" style="display: none;">
+            <p class="spacer" style="height: 2px;">
+
+            </p>
+            <div class="product_type" onclick="show_print_interface()">
+                <span class="upper_type_label">
+                    <h4 class="text-center" style="font-weight: bolder;">Print Receipt</h4>
+                </span>
+            </div>
+            <p class="spacer" style="height: 8px;">
+
+            </p>
+        </div>
+
+        <div class="row">
+            <div class="col-6">
+                <!-- Hidden HTML template for JavaScript compatibility -->
+                <div class="info_pad" id="print_template" style="display: none;">
+                    <br>
+                    <img src="static/assets/{{shop_data[0]['shop_banner_one']}}" alt="" style="width: 50px; height: 50px; position: relative; left: 42%;">
+                    <p class="text-center">{{shop_data[0]['pos_shop_name']}}</p>
+                    <p class="text-center">{{shop_data[0]['pos_shop_call_number']}}</p>
+                    <p class="text-center">{{shop_data[0]['pos_shop_email']}}</p>
+                    <p class="text-center">{{shop_data[0]['shop_adress']}}</p>
+                    <p class="text-center">Served by: {{user_name['user_name']}}</p>
+
+                    <span>--------------------------------------</span>
+                    <div id="sale_listing">
+                        <table style="width:100%">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Item</th>
+                                    <th>Price</th>
+                                </tr>
+                            </thead>
+                            <tbody id="checkout_items_table_body"></tbody>
+                        </table>
+                        <br>
+                        <span>--------------------------------------</span>
+                        <table style="width: 100%;">
+                            <tbody>
+                                <tr id="total_row"></tr>
+                                <tr id="sub_total_row"></tr>
+                                <tr id="vat_total_row"></tr>
+                                <tr id="cash_row"></tr>
+                                <tr id="change_row"></tr>
+                            </tbody>
+                        </table>
+                        <br>
+                        <span>--------------------------------------</span>
+                        <h6 class="text-center" id="tranx_code"></h6>
+                        <img src="" alt="" id="barcode_area">
+                        <br><br>
+                        <div id="qrcode_area"></div>
+                        <br><br>
+                        <span>--------------------------------------</span>
+                        <br><br>
+                        <h6 id="serve_time"></h6>
+                        <h6 id="bye_bye">Thanks for shopping with us!</h6>
+                    </div>
+                </div>
+
+                <!-- PDF Viewer for 58mm thermal receipt -->
+                <div class="info_pad" id="pdf_viewer_container" style="display: block; padding: 10px;">
+                    <h5 class="text-center" style="margin-bottom: 10px;">Receipt Preview (58mm Thermal)</h5>
+                    <div style="width: 100%; height: 621px; border: 1px solid #ddd; background: #f9f9f9;">
+                        <iframe id="receipt_pdf_viewer"
+                                style="width: 100%; height: 621px; border: none;"
+                                title="Receipt Preview">
+                        </iframe>
+                    </div>
+                    <p class="text-center" style="font-size: 12px; color: #666; margin-top: 5px;">
+                        58mm thermal paper layout - No payment information shown
+                    </p>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="info_pad" id="checkout_sale" style="background-color: #FEC620; border-radius: 8px; padding: 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                    <input type="hidden" name="recording_user" id="recording_user" value="{{user_name['user_name']}}">
+
+                    <!-- Payment Method Selection Header -->
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <h3 style="color: #333; font-weight: 600; margin: 0;"><b>💳 Choose Payment Method</b></h3>
+                        <p style="color: #666; font-size: 14px; margin: 5px 0 0 0;">Select your preferred payment option</p>
+                    </div>
+
+                    <!-- Payment Method Buttons -->
+                    <div style="display: flex; gap: 10px; margin-bottom: 25px; flex-wrap: wrap;">
+                        <button type="button" id="cash_btn" class="payment-method-btn active"
+                                onclick="selectPaymentMethod('cash')" style="flex: 1; min-width: 120px;">
+                            <span style="font-size: 18px;">💵</span><br>
+                            <span style="font-weight: 600;">Cash</span>
+                        </button>
+                        <button type="button" id="mpesa_btn" class="payment-method-btn"
+                                onclick="selectPaymentMethod('mpesa')" style="flex: 1; min-width: 120px;">
+                            <span style="font-size: 18px;">📱</span><br>
+                            <span style="font-weight: 600;">M-Pesa</span>
+                        </button>
+                        <button type="button" id="mpesa_online_btn" class="payment-method-btn"
+                                onclick="selectPaymentMethod('mpesa_online')" style="flex: 1; min-width: 120px;">
+                            <span style="font-size: 18px;">🔄</span><br>
+                            <span style="font-weight: 600;">M-Pesa Online</span>
+                        </button>
+                    </div>
+
+                    <!-- Cash Payment Fields -->
+                    <div id="cash_fields" class="payment-fields" style="display: block;">
+                        <div style="background: white; padding: 15px; border-radius: 6px; border: 2px solid #e0e0e0;">
+                            <h5 style="color: #333; margin: 0 0 15px 0; text-align: center;">
+                                💵 <strong>Cash Payment</strong>
+                            </h5>
+                            <div style="margin-bottom: 15px;">
+                                <label for="checkout_payment_input" style="display: block; font-weight: 600; color: #555; margin-bottom: 5px;">Enter Cash Amount</label>
+                                <input type="number" id="checkout_payment_input" step="0.01" min="0"
+                                       style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 4px; font-size: 16px; font-weight: 600; text-align: center;"
+                                       placeholder="KES 0.00" autofocus>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- M-Pesa Payment Fields -->
+                    <div id="mpesa_fields" class="payment-fields" style="display: none;">
+                        <div style="background: white; padding: 15px; border-radius: 6px; border: 2px solid #ddd;">
+                            <h5 style="color: #333; margin: 0 0 15px 0; text-align: center;">
+                                📱 <strong>M-Pesa Payment</strong>
+                            </h5>
+                            <div style="margin-bottom: 15px;">
+                                <label for="mpesa_gateway" style="display: block; font-weight: 600; color: #555; margin-bottom: 5px;">Select Gateway</label>
+                                <select id="mpesa_gateway" style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 4px; font-size: 14px; background: white;">
+                                    <option value="223111-476921">🏪 Gateway 1 (223111-476921)</option>
+                                    <option value="400200-6354">🏪 Gateway 2 (400200-6354)</option>
+                                    <option value="765244-80872">🏪 Gateway 3 (765244-80872)</option>
+                                </select>
+                            </div>
+                            <div style="margin-bottom: 15px;">
+                                <label for="mpesa_payment_input" style="display: block; font-weight: 600; color: #555; margin-bottom: 5px;">Payment Amount</label>
+                                <input type="number" id="mpesa_payment_input" step="0.01" min="0"
+                                       style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 4px; font-size: 16px; font-weight: 600; text-align: center;"
+                                       placeholder="KES 0.00">
+                            </div>
+                            <div style="margin-bottom: 15px;">
+                                <label for="mpesa_reference_input" style="display: block; font-weight: 600; color: #555; margin-bottom: 5px;">Transaction Reference</label>
+                                <input type="text" id="mpesa_reference_input"
+                                       style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 4px; font-size: 14px; text-transform: uppercase;"
+                                       placeholder="Enter M-Pesa reference" maxlength="20">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- M-Pesa Online Payment Fields -->
+                    <div id="mpesa_online_fields" class="payment-fields" style="display: none;">
+                        <div style="background: white; padding: 15px; border-radius: 6px; border: 2px solid #ddd;">
+                            <h5 style="color: #333; margin: 0 0 15px 0; text-align: center;">
+                                🔄 <strong>M-Pesa Online Reconciliation</strong>
+                            </h5>
+
+                            <!-- Pending Payments Selector -->
+                            <div style="margin-bottom: 20px;">
+                                <label for="pending_payments_select" style="display: block; font-weight: 600; color: #555; margin-bottom: 8px;">
+                                    📋 Select Received Payment
+                                </label>
+                                <select id="pending_payments_select" onchange="onPaymentSelectionChange()"
+                                        style="width: 100%; padding: 12px; border: 2px solid #007bff; border-radius: 4px; font-size: 14px; background: white;">
+                                    <option value="">🔄 Loading pending payments...</option>
+                                </select>
+                            </div>
+
+                            <!-- Enhanced Selected Payment Info -->
+                            <div id="selected_payment_info" class="selected-payment-card"
+                                 style="display: none; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                                <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                                    <span style="font-size: 20px; margin-right: 10px;">✅</span>
+                                    <strong style="font-size: 16px;">Selected Payment Details</strong>
+                                </div>
+                                <div style="background: rgba(255,255,255,0.1); padding: 12px; border-radius: 6px; backdrop-filter: blur(10px);">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                        <span style="font-weight: 600;">Amount:</span>
+                                        <span id="selected_payment_amount" style="font-size: 18px; font-weight: 700;">KES 0.00</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                        <span style="font-weight: 600;">Sender:</span>
+                                        <span id="selected_payment_sender">Unknown</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                        <span style="font-weight: 600;">Reference:</span>
+                                        <span id="selected_payment_reference" style="font-family: monospace;">N/A</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <span style="font-weight: 600;">Date:</span>
+                                        <span id="selected_payment_date">Unknown</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Reconciliation Status -->
+                            <div id="reconciliation_status" class="reconciliation-status"
+                                 style="padding: 12px; border-radius: 6px; text-align: center; font-weight: 600; display: none;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Error Message -->
+                    <div id="input_error" class="error-message"
+                         style="display: none; background: #ff4444; color: white; padding: 10px; border-radius: 4px; text-align: center; font-weight: 600; margin-top: 15px;">
+                        ⚠️ Invalid input! Please check your entries.
+                    </div>
+
+                    <!-- Payment Summary -->
+                    <div style="background: rgba(255,255,255,0.9); padding: 15px; border-radius: 6px; margin-top: 20px; border: 1px solid #e0e0e0;">
+                        <div style="text-align: center; margin-bottom: 10px;">
+                            <h6 style="color: #333; margin: 0; font-weight: 600;">💰 Payment Summary</h6>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <span style="font-weight: 600; color: #555;">Total:</span>
+                            <span id="sale_total_display2" style="font-weight: 700; font-size: 16px; color: #333;">KES 0.00</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <span style="font-weight: 600; color: #555;">Payment:</span>
+                            <span id="sale_payment" style="font-weight: 700; font-size: 16px; color: #007bff;">KES 0.00</span>
+                        </div>
+                        <hr style="margin: 10px 0; border: none; border-top: 1px solid #ddd;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight: 600; color: #555;">Change:</span>
+                            <span id="sale_change_display" style="font-weight: 700; font-size: 16px; color: #28a745;">KES 0.00</span>
+                        </div>
+                    </div>
+                </div>
+                <br>
+                <br>
+                <div class="after-container4" id="add_btn_container" >
+                    <p class="spacer" style="height: 2px;">
+                        
+                    </p>
+                    <div class="product_type" onclick="update_payment()">
+                        <span class="upper_type_label">
+                            <h4 class="text-center" style="font-weight: bolder;">Add</h4>
+                        </span>
+                    </div>
+                    <p class="spacer" style="height: 8px;">
+                        
+                    </p>
+                </div>
+                <br>
+                <div class="after-container4" id="checkout_button_container" style="opacity: 0.5; pointer-events: none;">
+                    <p class="spacer" style="height: 2px;">
+
+                    </p>
+                    <div class="product_type" onclick="add_sale_record()" style="background-color: #ccc; cursor: not-allowed;">
+                        <span class="upper_type_label">
+                            <h4 class="text-center" style="font-weight: bolder;">Checkout</h4>
+                        </span>
+                    </div>
+                    <p style="text-align: center; font-size: 12px; color: #666; margin-top: 5px;">
+                        💡 Add payment details first
+                    </p>
+                    <p class="spacer" style="height: 8px;">
+
+                    </p>
+                </div>
+                <div class="after-container4" id="print_button_container" style="display: none; position: relative; top: 35%;">
+                    <p class="spacer" style="height: 2px;">
+
+                    </p>
+
+                    <div class="product_type" onclick="trigger_print_dialogue()">
+                        <span class="upper_type_label">
+                            <h4 class="text-center" style="font-weight: bolder;">Print</h4>
+                        </span>
+                    </div>
+                    <p class="spacer" style="height: 8px;">
+
+                    </p>
+                    <div class="product_type" onclick="cancel_print_and_clear()">
+                        <span class="upper_type_label">
+                            <h4 class="text-center" style="font-weight: bolder;">Cancel</h4>
+                        </span>
+                    </div>
+                    <p class="spacer" style="height: 8px;">
+
+                    </p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+
+<div class="footer" style="height: 60px;">
+    <p>
+    </p>
+</div>
+<script src="../static/node_modules/print-js/dist/print.js"></script>
+
+<script src="../static/js/main.js"></script>
+<script>
+    function print_sale_receipt(){
+        printJS('print_template', 'html')
+    }
+</script>
+<script >
+    if (storageAvailable('localStorage')){
+        console.log("localstorage available in sales page")
+        let sale_object = JSON.parse(localStorage.getItem('current_items_pack'))
+
+        if(sale_object != null)  {
+            display_items()
+        }
+        else{
+            reset_app()
+        }
+        }
+    else {
+    console.log("localStorage not available in sales page")
+    } 
+</script>
+
+{% endblock content %}

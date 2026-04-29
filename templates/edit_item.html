@@ -1,0 +1,140 @@
+{% extends 'side_nav_base.html' %}
+
+{% block content %}
+<br>
+<div class="container-fluid" style="position: relative; margin: auto;">
+
+    {% if flash_message -%}
+    <div class="after-container4" id="flash_message_container">
+        <p class="spacer" style="height: 12px;"></p>
+        <div class="info_pad">
+            <div class="row">
+                <div class="col-11">
+                    <p class="text-center">{{ flash_payload }}</p>
+                </div>
+                <div class="col-1">
+                    <span class="" onclick="destroy_el()">
+                        <i class="fa fa-times-circle" style="font-weight: bolder;"></i>
+                    </span>
+                </div>
+            </div>
+        </div>
+        <p class="spacer" style="height: 18px;"></p>
+    </div>
+    {%- endif %}
+
+    <div class="after-container4">
+        <p class="spacer" style="height: 12px;"></p>
+        <div class="info_pad">
+            <form action="/update_item_inventory" method="post" class="container">
+                <input type="hidden" name="item_id" value="{{ item.id }}">
+                <div class="row">
+                    <div class="col-1"></div>
+                    <div class="col-10">
+                        <h3 class="text-center"><b>Edit Item Details</b></h3>
+                        <br>
+                    </div>
+                    <div class="col-1"></div>
+                </div>
+                <div class="row">
+                    <div class="col-6">
+                        <div class="row">
+                            <div class="col-3">
+                                <label for="item_type">Type</label>
+                            </div>
+                            <div class="col-3">
+                                <input type="text" name="item_type" id="item_type" required value="{{ item.item_type }}" readonly>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-3">
+                                <label for="item_stock">Stock</label>
+                            </div>
+                            <div class="col-3">
+                                <input type="text" name="item_stock" id="item_stock" required value="0" class="highlighted-input">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-3">
+                                <label for="item_name">Name</label>
+                            </div>
+                            <div class="col-3">
+                                <input type="text" name="item_name" id="item_name" required value="{{ item.name }}" readonly>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-3">
+                                <label for="item_description">Description</label>
+                            </div>
+                            <div class="col-3">
+                                <input type="text" name="item_description" id="item_description" required value="{{ item.description }}" readonly >
+
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-3">
+                                <label for="item_price">Price</label>
+                            </div>
+                            <div class="col-3">
+                                <input type="text" name="item_price" id="item_price" required value="{{ item.price }}" class="highlighted-input">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-3">
+                                <label for="re_stock_value">Re-stock Value</label>
+                            </div>
+                            <div class="col-3">
+                                <input type="text" name="re_stock_value" id="re_stock_value" value="{{ item.re_stock_value }}" class="highlighted-input">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="row">
+                            <div class="col-3">
+                                <label for="item_code">UPC Code</label>
+                            </div>
+                            <div class="col-3">
+                                <!-- read only value for item_code -->
+                                <input type="text" name="item_code" id="item_code" required value="{{ item.uid }}" readonly>
+                                
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <br>
+                <button class="form_product_type" type="submit">
+                    <span class="form_upper_type_label">
+                        <h4 class="text-center" style="font-weight: bold; color:white">Update</h4>
+                    </span>
+                </button>
+
+                <!-- Add a "Cancel" button with the same style -->
+                <button class="form_product_type" type="button" onclick="window.location.href='/'">
+                    <span class="form_upper_type_label">
+                        <h4 class="text-center" style="font-weight: bold; color:white">Cancel</h4>
+                    </span>
+                </button>
+            </form>
+        </div>
+        <p class="spacer" style="height: 18px;"></p>
+    </div>
+
+</div>
+<div class="footer" style="height: 60px;">
+    <p>
+    </p>
+</div>
+<script src="../static/js/main.js"></script>
+<script>
+    if (storageAvailable('localStorage')) {
+        console.log("localstorage available in inventory page")
+    } else {
+        console.log("localStorage not available in inventory page")
+    }
+</script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var dataTable = new DataTable('#inventory_table');
+    });
+</script>
+{% endblock content %}

@@ -1,0 +1,675 @@
+{% extends 'side_nav_base.html' %}
+
+{% block content %}
+<br>
+<div class="container-fluid" style="position: relative; margin: auto;">
+    
+    {% if flash_message -%}
+    <div class="after-container4" id="flash_message_container">
+        <p class="spacer" style="height: 12px;"></p>
+        <div class="info_pad" >
+            <div class="row">
+                <div class="col-11">
+                    <p class="text-center">{{flash_payload}}</p>
+                </div>
+                <div class="col-1">
+                    <span class="" onclick="destroy_el()">
+                        <i class="fa fa-times-circle" style="font-weight: bolder;"></i>
+                    </span>
+                </div>
+            </div>
+        </div>
+        <p class="spacer" style="height: 18px;"></p>
+    </div>
+    {%- endif %}
+
+    <div class="after-container4">
+        <p class="spacer" style="height: 12px;"></p>
+        <div class="info_pad">
+            <form action="/add_item_inventory" method="post" class="container">
+                <div class="row">
+                    <div class="col-1"></div>
+                    <div class="col-10">
+                        <h3 class="text-center"><b>Enter Item Details</b></h3>
+                        <br>
+                    </div>
+                    <div class="col-1"></div>
+                </div>
+                <div class="row">
+                    <div class="col-6">
+                        <div class="row">
+                            <div class="col-3">
+                                <label for="item_name">Name</label>
+                            </div>
+                            <div class="col-3">
+                                <input type="text" name="item_name" id="item_name" required >
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-3">
+                                <label for="item_type">Type</label>
+                            </div>
+                            <div class="col-3">
+                                <input type="text" name="item_type" id="item_type" required >
+                            </div>
+                        </div>
+                        
+                        
+                        <div class="row">
+                            <div class="col-3">
+                                <label for="item_description">Description</label>
+                            </div>
+                            <div class="col-3">
+                                <input type="text" name="item_description" id="item_description" required >
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-3">
+                                <label for="item_price">Price</label>
+                            </div>
+                            <div class="col-3">
+                                <input type="text" name="item_price" id="item_price" required >
+                            </div>
+                        </div>
+                        
+                    </div>
+                    <div class="col-6">
+                        <div class="row">
+                            <div class="col-3">
+                                <label for="item_code">UPC Code</label>
+                            </div>
+                            <div class="col-3">
+                               <input type="text" name="item_code" id="item_code" required >
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-3">
+                                <label for="item_stock">Stock No</label>
+                            </div>
+                            <div class="col-3">
+                                <input type="text" name="item_stock" id="item_stock" required >
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-3">
+                                <label for="re_stock_value">Re-stock No</label>
+                            </div>
+                            <div class="col-3">
+                                <input type="text" name="re_stock_value" id="re_stock_value" >
+                            </div>
+                        </div>
+                        
+                    </div>
+                </div>
+                <br>
+                <button class="form_product_type" type="submit">
+                    <span class="form_upper_type_label">
+                        <h4 class="text-center" style="font-weight: bold; color:white">Add</h4>
+                    </span>
+                </button>
+            </form>
+        </div>
+        <p class="spacer" style="height: 18px;"></p>
+    </div>
+    <br>
+    
+    <div class="inventory-record-after-container4" id="inventory_listing_container">
+        <p class="spacer" style="height: 12px;"></p>
+        <h3 class="text-center" id="license_key_header"><b> inventory</b></h3>
+        <br>
+        <!-- button component for refreshing the page -->
+        <div class="product_type" onclick="window.location.reload()">
+            <span class="upper_type_label">
+                <h4 class="text-center" style="font-weight: bolder;">
+                    Refresh
+                    <span class="icon"><i class="fa fa-refresh"></i></span>
+                </h4>
+        </span>
+        </div>
+        <br>
+        <div class="info_pad">
+            <table style="width: 100%;" id="inventory_table" class="table table-striped table-bordered">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>UPC Code</th>
+                        <th>Type</th>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>Price</th>
+
+                        <th>Last Stock Entry</th> <!-- Add this column -->
+                        <th>Current Stock</th>
+                        <th>Re-stock Value</th>
+                        <th>Re-stock</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="inventory_table_body">
+                {% for item in items %}
+                <tr>
+                    <td>{{ item.id }}</td>
+                    <td>{{ item.uid }}</td>
+                    <td>{{ item.item_type }}</td>
+                    <td>{{ item.name }}</td>
+                    <td>{{ item.description }}</td>
+                    <td>{{ item.price }}</td>
+
+                    <td>{{ item.last_stock_count }}</td>
+                    <td>{{ item.current_stock_count }}</td>
+                    <td>{{ item.re_stock_value }}</td>
+                    <td>{{ "Yes" if item.re_stock_status else "No" }}</td>
+
+                    <td>
+                        <div style="display: flex; justify-content: space-between;">
+                            <form action="/edit_item" method="post">
+                                <input type="hidden" name="item_uid" value="{{ item.uid }}">
+                                <button class="inventory_btn" type="submit" id="item_edit_btn">
+                                    <span class="form_upper_type_label">
+                                        <h4 class="text-center" style="font-weight: bold; color:white">Edit</h4>
+                                    </span>
+                                </button>
+                            </form>
+                            <form action="/delete_item_inventory" method="post">
+                                <input type="hidden" name="item_uid" value="{{ item.uid }}">
+                                <button class="inventory_btn" type="submit" id="item_delete_btn">
+                                    <span class="form_upper_type_label">
+                                        <h4 class="text-center" style="font-weight: bold; color:white">Delete</h4>
+                                    </span>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+
+            <!-- Pagination controls for inventory -->
+            <div class="pagination-container" id="inventory_pagination" data-table="inventory" data-current-page="{{ items_current_page }}" data-total-pages="{{ items_total_pages }}">
+                <button class="pagination-btn pagination-prev" data-action="prev">Previous</button>
+                <span>Page {{ items_current_page }} of {{ items_total_pages }}</span>
+                <button class="pagination-btn pagination-next" data-action="next">Next</button>
+            </div>
+
+        </div>
+      
+        <p class="spacer" style="height: 2px;"></p>
+        <div class="product_type" onclick="print_restock_list()">
+            <span class="upper_type_label">
+                <h4 class="text-center" style="font-weight: bolder;">
+                    Re-stock
+                    <span class="icon"><i class="fa fa-print"></i></span>
+                </h4>
+            </span>
+        </div>
+
+        <br>
+        <h3 class="text-center" id="license_key_header"><b> Item Sale Record</b></h3>
+        <br>
+        <div class="sales_info_pad">
+            <table style="width: 100%;" id="sale_item_transaction_record_table" class="table table-striped table-bordered">
+                <thead class="table-dark">
+                    <tr>
+
+                        <th>ID</th>
+                        <th>Item Code</th>
+                        <th>Item Name</th>
+                        <th>Transaction Type</th>
+                        <th>Quantity</th>
+                        <th>Sale Price</th>
+                        <th>Date Time</th>
+                    </tr>
+                </thead>
+                <tbody id="transactions_table_body">
+                {% for sale in item_transactions -%}
+                <tr>
+
+                    <td>{{ sale.id }}</td>
+                    <td>{{ sale.item_uid }}</td>
+                    <td>{{ SaleItem.query.filter_by(uid=sale.item_uid).first().name}}</td>
+                    <td>{{ sale.transaction_type}}</td>
+                    <td>{{ sale.transaction_quantity}}</td>
+                    <td>{{ sale.item_price}}</td>
+                    <td>{{ sale.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+                </tr>
+                {%- endfor %}
+                </tbody>
+            </table>
+
+            <!-- Pagination controls for transactions -->
+            <div class="pagination-container" id="transactions_pagination" data-table="transactions" data-current-page="{{ transactions_current_page }}" data-total-pages="{{ transactions_total_pages }}">
+                <button class="pagination-btn pagination-prev" data-action="prev">Previous</button>
+                <span>Page {{ transactions_current_page }} of {{ transactions_total_pages }}</span>
+                <button class="pagination-btn pagination-next" data-action="next">Next</button>
+            </div>
+        </div>
+        <!-- <div class="product_type"onclick="window.location.href='/get_sale_transaction_printout';">
+            <span class="upper_type_label">
+                <h4 class="text-center" style="font-weight: bolder;">
+                    Sale 
+                    <span class="icon"><i class="fa fa-print"></i></span>
+                </h4>
+            </span>
+        </div> -->
+        <br>
+        
+        <h3 class="text-center" id="license_key_header"><b> Total Sale Records</b></h3>
+        <br>
+        <div class="sales_info_pad">
+            <table style="width: 100%;" id="sales_record_table" class="table table-striped table-bordered">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Transaction ID</th>
+                        <th>ID</th>
+                        <th>Clerk</th>
+                        <th>Total</th>
+                        <th>Amount</th>
+                        <th>Change</th>
+                        <th>Payment Method</th>
+                        <th>Payment Reference</th>
+                        <th>Payment Gateway</th>
+                        <th>Date Time</th>
+                    </tr>
+                </thead>
+                <tbody id="sales_table_body">
+                {% for sale in sale_records -%}
+                <tr>
+                    <td>{{ sale.uid }}</td>
+                    <td>{{ sale.id }}</td>
+                    <td>{{ sale.sale_clerk }}</td>
+                    <td>{{ sale.sale_total }}</td>
+                    <td>{{ sale.sale_paid_amount }}</td>
+                    <td>{{ sale.sale_balance }}</td>
+                    <td>{{ sale.payment_method }}</td>
+                    <td>{{ sale.payment_reference }}</td>
+                    <td>{{ sale.payment_gateway }}</td>
+                    <td>{{ sale.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+                </tr>
+                {%- endfor %}
+                </tbody>
+            </table>
+
+            <!-- Pagination controls for sales records -->
+            <div class="pagination-container" id="sales_pagination" data-table="sales" data-current-page="{{ sale_records_current_page }}" data-total-pages="{{ sale_records_total_pages }}">
+                <button class="pagination-btn pagination-prev" data-action="prev">Previous</button>
+                <span>Page {{ sale_records_current_page }} of {{ sale_records_total_pages }}</span>
+                <button class="pagination-btn pagination-next" data-action="next">Next</button>
+            </div>
+        </div>
+        <div class="product_type" onclick="show_sales_report_modal()">
+            <span class="upper_type_label">
+                <h4 class="text-center" style="font-weight: bolder;">
+                    Sales
+                    <span class="icon"><i class="fa fa-print"></i></span>
+                </h4>
+            </span>
+        </div>
+        <p class="spacer" style="height: 24px;"></p>
+    </div>
+
+    <!-- Sales Report Period Selection Modal -->
+    <div class="modal fade" id="salesReportModal" tabindex="-1" aria-labelledby="salesReportModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content" style="border: 2px solid #182A62; background-color: #FEC620;">
+                <div class="modal-header" style="background-color: #182A62; color: white;">
+                    <h5 class="modal-title" id="salesReportModalLabel">Select Sales Report Period</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" style="background-color: #FEC620;">
+                    <form id="salesReportForm">
+                        <div class="mb-3">
+                            <label style="color: #182A62; font-weight: bold; margin-bottom: 10px; display: block;">Report Period:</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="reportPeriod" id="printAll" value="all" checked onchange="toggleDateFields()">
+                                <label class="form-check-label" for="printAll" style="color: #182A62; font-weight: bold;">
+                                    Print All Records
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="reportPeriod" id="todayOnly" value="today" onchange="toggleDateFields()">
+                                <label class="form-check-label" for="todayOnly" style="color: #182A62; font-weight: bold;">
+                                    Today's Sales Only
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="reportPeriod" id="customRange" value="custom" onchange="toggleDateFields()">
+                                <label class="form-check-label" for="customRange" style="color: #182A62; font-weight: bold;">
+                                    Custom Date Range
+                                </label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="startDate" class="form-label" style="color: #182A62; font-weight: bold;">Start Date</label>
+                            <input type="date" class="form-control" id="startDate" required style="border-color: #182A62;">
+                        </div>
+                        <div class="mb-3">
+                            <label for="endDate" class="form-label" style="color: #182A62; font-weight: bold;">End Date</label>
+                            <input type="date" class="form-control" id="endDate" required style="border-color: #182A62;">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer" style="border-top: 2px solid #182A62;">
+                    <button type="button" class="btn btn-outline-secondary" onclick="close_sales_modal()" style="border-color: #182A62; color: #182A62;">Cancel</button>
+                    <button type="button" class="btn" onclick="generate_sales_report()" style="background-color: #182A62; border-color: #182A62; color: white;">Generate Report PDF</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+</div>
+<div class="footer" style="height: 60px;">
+    <p></p>
+</div>
+<script src="../static/js/main.js"></script>
+<script>
+    // Store modal instance for later use
+    let salesReportModalInstance = null;
+
+    if (storageAvailable('localStorage')){
+        console.log("localstorage available in inventory page");
+    }
+    else {
+        console.log("localStorage not available in inventory page");
+    }
+</script>
+<script>
+    // Pagination functionality
+    function changePage(tableType, page) {
+        if (page < 1) return;
+
+        // Map table types to correct API endpoints
+        let endpoint;
+        if (tableType === 'inventory') {
+            endpoint = 'items';
+        } else if (tableType === 'transactions') {
+            endpoint = 'transactions';
+        } else if (tableType === 'sales') {
+            endpoint = 'sales';
+        } else {
+            console.error('Unknown table type:', tableType);
+            return;
+        }
+
+        fetch(`/api/inventory/${endpoint}/${page}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                updateTable(tableType, data);
+                updatePagination(tableType, data);
+            })
+            .catch(error => console.error('Error loading page:', error));
+    }
+
+    function updateTable(tableType, data) {
+        let tbody, itemName;
+        if (tableType === 'inventory') {
+            tbody = document.getElementById('inventory_table_body');
+            itemName = 'items';
+        } else if (tableType === 'transactions') {
+            tbody = document.getElementById('transactions_table_body');
+            itemName = 'transactions';
+        } else if (tableType === 'sales') {
+            tbody = document.getElementById('sales_table_body');
+            itemName = 'records';
+        }
+
+        tbody.innerHTML = '';
+
+        data[itemName].forEach(item => {
+            const row = document.createElement('tr');
+
+            if (tableType === 'inventory') {
+                row.innerHTML = `
+                    <td>${item.id}</td>
+                    <td>${item.uid}</td>
+                    <td>${item.item_type}</td>
+                    <td>${item.name}</td>
+                    <td>${item.description}</td>
+                    <td>${item.price}</td>
+                    <td>${item.last_stock_count}</td>
+                    <td>${item.current_stock_count}</td>
+                    <td>${item.re_stock_value}</td>
+                    <td>${item.re_stock_status ? 'Yes' : 'No'}</td>
+                    <td>
+                        <div style="display: flex; justify-content: space-between;">
+                            <form action="/edit_item" method="post">
+                                <input type="hidden" name="item_uid" value="${item.uid}">
+                                <button class="inventory_btn" type="submit" id="item_edit_btn">
+                                    <span class="form_upper_type_label">
+                                        <h4 class="text-center" style="font-weight: bold; color:white">Edit</h4>
+                                    </span>
+                                </button>
+                            </form>
+                            <form action="/delete_item_inventory" method="post">
+                                <input type="hidden" name="item_uid" value="${item.uid}">
+                                <button class="inventory_btn" type="submit" id="item_delete_btn">
+                                    <span class="form_upper_type_label">
+                                        <h4 class="text-center" style="font-weight: bold; color:white">Delete</h4>
+                                    </span>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                `;
+            } else if (tableType === 'transactions') {
+                row.innerHTML = `
+                    <td>${item.id}</td>
+                    <td>${item.item_uid}</td>
+                    <td>${item.item_name || 'N/A'}</td>
+                    <td>${item.transaction_type}</td>
+                    <td>${item.transaction_quantity}</td>
+                    <td>${item.item_price}</td>
+                    <td>${item.created_at}</td>
+                `;
+            } else if (tableType === 'sales') {
+                row.innerHTML = `
+                    <td>${item.uid}</td>
+                    <td>${item.id}</td>
+                    <td>${item.sale_clerk}</td>
+                    <td>${item.sale_total}</td>
+                    <td>${item.sale_paid_amount}</td>
+                    <td>${item.sale_balance}</td>
+                    <td>${item.payment_method || ''}</td>
+                    <td>${item.payment_reference || ''}</td>
+                    <td>${item.payment_gateway || ''}</td>
+                    <td>${item.created_at}</td>
+                `;
+            }
+
+            tbody.appendChild(row);
+        });
+    }
+
+    function updatePagination(tableType, data) {
+        const paginationDiv = document.getElementById(`${tableType}_pagination`);
+        const prevBtn = paginationDiv.querySelector('.pagination-prev');
+        const nextBtn = paginationDiv.querySelector('.pagination-next');
+        const span = paginationDiv.querySelector('span');
+
+        // Update data attributes for event delegation
+        paginationDiv.dataset.currentPage = data.current_page;
+        paginationDiv.dataset.totalPages = data.total_pages;
+
+        span.textContent = `Page ${data.current_page} of ${data.total_pages}`;
+
+        // Disable buttons if needed
+        if (prevBtn) prevBtn.disabled = data.current_page <= 1;
+        if (nextBtn) nextBtn.disabled = data.current_page >= data.total_pages;
+    }
+
+    function print_restock_list() {
+        console.log("Starting restock list print display");
+
+        const currentOrigin = window.location.origin;
+        const printUrl = `${currentOrigin}/get_restock_printout?format=print`;
+
+        // Open restock list in new window/tab for printing (same dimensions as sales receipt)
+        const printWindow = window.open(printUrl, '_blank', 'width=400,height=600,scrollbars=yes,resizable=yes');
+
+        // Focus the new window
+        if (printWindow) {
+            printWindow.focus();
+            console.log('Restock list print display initiated');
+        } else {
+            console.error("Failed to open print window - popup blocker may be active");
+            alert("Error: Could not open print window. Please disable popup blocker and try again.");
+        }
+    }
+
+    function show_sales_report_modal() {
+        console.log("Showing sales report modal");
+
+        // Set default selection to "Print All Records"
+        document.getElementById('printAll').checked = true;
+
+        // Disable date fields for "Print All"
+        document.getElementById('startDate').disabled = true;
+        document.getElementById('endDate').disabled = true;
+        document.getElementById('startDate').required = false;
+        document.getElementById('endDate').required = false;
+
+        // Show modal
+        salesReportModalInstance = new bootstrap.Modal(document.getElementById('salesReportModal'), {
+            backdrop: 'static', // Prevent closing by clicking backdrop
+            keyboard: true     // Allow closing with ESC key
+        });
+        salesReportModalInstance.show();
+    }
+
+    function close_sales_modal() {
+        console.log("Closing sales report modal");
+        if (salesReportModalInstance) {
+            salesReportModalInstance.hide();
+        }
+    }
+
+    function toggleDateFields() {
+        const selectedPeriod = document.querySelector('input[name="reportPeriod"]:checked').value;
+        const startDateField = document.getElementById('startDate');
+        const endDateField = document.getElementById('endDate');
+
+        if (selectedPeriod === 'all') {
+            // Disable date fields for "Print All Records"
+            startDateField.disabled = true;
+            endDateField.disabled = true;
+            startDateField.required = false;
+            endDateField.required = false;
+            startDateField.value = '';
+            endDateField.value = '';
+        } else if (selectedPeriod === 'today') {
+            // Set both dates to today for "Today's Sales Only"
+            const today = new Date().toISOString().split('T')[0];
+            startDateField.value = today;
+            endDateField.value = today;
+
+            // Disable date fields
+            startDateField.disabled = true;
+            endDateField.disabled = true;
+            startDateField.required = false;
+            endDateField.required = false;
+        } else if (selectedPeriod === 'custom') {
+            // Enable date fields for custom range
+            startDateField.disabled = false;
+            endDateField.disabled = false;
+            startDateField.required = true;
+            endDateField.required = true;
+        }
+    }
+
+    function generate_sales_report() {
+        console.log("Generating sales report");
+
+        const selectedPeriod = document.querySelector('input[name="reportPeriod"]:checked').value;
+
+        // Close modal
+        if (salesReportModalInstance) {
+            salesReportModalInstance.hide();
+        }
+
+        // Generate report URL based on selected period
+        const currentOrigin = window.location.origin;
+        let printUrl;
+
+        if (selectedPeriod === 'all') {
+            // Print all records - no date parameters
+            printUrl = `${currentOrigin}/get_sale_record_printout`;
+        } else {
+            // For today or custom range, get date values
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+
+            // Validate dates for custom range
+            if (selectedPeriod === 'custom') {
+                if (!startDate || !endDate) {
+                    alert("Please select both start and end dates");
+                    return;
+                }
+
+                if (new Date(startDate) > new Date(endDate)) {
+                    alert("Start date cannot be after end date");
+                    return;
+                }
+            }
+
+            printUrl = `${currentOrigin}/get_sale_record_printout?start_date=${startDate}&end_date=${endDate}`;
+        }
+
+        // Open sales records report in new window/tab for printing (landscape A4 dimensions)
+        const printWindow = window.open(printUrl, '_blank', 'width=1000,height=700,scrollbars=yes,resizable=yes');
+
+        // Focus the new window
+        if (printWindow) {
+            printWindow.focus();
+            console.log('Sales records report display initiated for period:', selectedPeriod);
+        } else {
+            console.error("Failed to open print window - popup blocker may be active");
+            alert("Error: Could not open print window. Please disable popup blocker and try again.");
+        }
+    }
+
+    // Initialize pagination state
+    document.addEventListener('DOMContentLoaded', function() {
+        // Set up event delegation for pagination buttons
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('pagination-prev') || e.target.classList.contains('pagination-next')) {
+                const paginationContainer = e.target.closest('.pagination-container');
+                const tableType = paginationContainer.dataset.table;
+                const currentPage = parseInt(paginationContainer.dataset.currentPage);
+                const totalPages = parseInt(paginationContainer.dataset.totalPages);
+                const action = e.target.dataset.action;
+
+                let newPage;
+                if (action === 'prev') {
+                    newPage = currentPage - 1;
+                } else if (action === 'next') {
+                    newPage = currentPage + 1;
+                }
+
+                if (newPage >= 1 && newPage <= totalPages) {
+                    changePage(tableType, newPage);
+                }
+            }
+        });
+
+        // Set initial button states based on data attributes
+        const paginationContainers = document.querySelectorAll('.pagination-container');
+        paginationContainers.forEach(container => {
+            const currentPage = parseInt(container.dataset.currentPage);
+            const totalPages = parseInt(container.dataset.totalPages);
+            const tableType = container.dataset.table;
+
+            const prevBtn = container.querySelector('.pagination-prev');
+            const nextBtn = container.querySelector('.pagination-next');
+
+            if (prevBtn) prevBtn.disabled = currentPage <= 1;
+            if (nextBtn) nextBtn.disabled = currentPage >= totalPages;
+        });
+    });
+</script>
+{% endblock content %}
